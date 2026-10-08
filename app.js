@@ -50,6 +50,8 @@ function normalizeUrl(raw) {
 }
 
 const icon = path => `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+const CHEVRON_LEFT = icon('<path d="m15 18-6-6 6-6"/>').replace('width="15" height="15"', 'width="20" height="20"');
+const CHEVRON_RIGHT = icon('<path d="m9 18 6-6-6-6"/>').replace('width="15" height="15"', 'width="20" height="20"');
 const ICONS = {
   email: icon('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>'),
   phone: icon('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
@@ -227,9 +229,9 @@ function renderCreate() {
           <div class="row-between">
             <span class="label">${t('days')}</span>
             <div class="cal-nav">
-              <button type="button" class="btn" data-nav="-1" aria-label="${esc(t('prevWeeks'))}">‹</button>
+              <button type="button" class="btn" data-nav="-1" aria-label="${esc(t('prevWeeks'))}">${CHEVRON_LEFT}</button>
               <span id="cal-range"></span>
-              <button type="button" class="btn" data-nav="1" aria-label="${esc(t('nextWeeks'))}">›</button>
+              <button type="button" class="btn" data-nav="1" aria-label="${esc(t('nextWeeks'))}">${CHEVRON_RIGHT}</button>
             </div>
           </div>
           <p class="hint">${t('daysHint')}</p>
@@ -471,9 +473,9 @@ async function renderEvent(id) {
   function renderPagers() {
     const shown = visibleDates();
     const html = dates.length > perPage
-      ? `<button type="button" class="btn" data-page="-1" aria-label="${esc(t('prevDays'))}"${pageStart === 0 ? ' disabled' : ''}>‹</button>
+      ? `<button type="button" class="btn" data-page="-1" aria-label="${esc(t('prevDays'))}"${pageStart === 0 ? ' disabled' : ''}>${CHEVRON_LEFT}</button>
          <span>${F.dayMonth.format(parseDate(shown[0]))} – ${F.dayMonth.format(parseDate(shown.at(-1)))} · ${pageStart + 1}–${pageStart + shown.length} / ${dates.length}</span>
-         <button type="button" class="btn" data-page="1" aria-label="${esc(t('nextDays'))}"${pageStart + perPage >= dates.length ? ' disabled' : ''}>›</button>`
+         <button type="button" class="btn" data-page="1" aria-label="${esc(t('nextDays'))}"${pageStart + perPage >= dates.length ? ' disabled' : ''}>${CHEVRON_RIGHT}</button>`
       : '';
     app.querySelectorAll('[data-pager]').forEach(el => { el.innerHTML = html; el.hidden = !html; });
   }

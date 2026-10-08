@@ -81,6 +81,32 @@ function contactLinks(contact) {
   return items.length ? `<div class="contacts"><span>${t('contactOrganizer')}</span>${items.join('')}</div>` : '';
 }
 
+// Evidenzia un campo da sistemare: bordo rosso sull'input, asterisco sull'etichetta.
+function markInvalid(el) {
+  if (el.matches('input, select, textarea')) el.classList.add('is-invalid');
+  el.closest('.field').classList.add('invalid');
+}
+
+function resetInvalid(form) {
+  form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+  form.querySelectorAll('.field.invalid').forEach(el => el.classList.remove('invalid'));
+}
+
+// Quando l'utente corregge un campo toglie l'evidenziazione; se non resta nulla
+// da sistemare, nasconde anche il messaggio di errore.
+function clearInvalid(el) {
+  const field = el?.closest?.('.field.invalid');
+  if (!field) return;
+  el.classList.remove('is-invalid');
+  if (field.querySelector('.is-invalid')) return;
+  field.classList.remove('invalid');
+  const form = field.closest('form');
+  if (form && !form.querySelector('.field.invalid')) {
+    const err = form.parentElement.querySelector('.error');
+    if (err) err.textContent = '';
+  }
+}
+
 const prefs = {
   get(key, fallback) { try { return localStorage.getItem(`quando:${key}`) || fallback; } catch { return fallback; } },
   set(key, value) { try { localStorage.setItem(`quando:${key}`, value); } catch {} },
@@ -322,8 +348,11 @@ function renderCreate() {
       next.forEach(k => selected.add(k));
       cal.querySelectorAll('[data-k]').forEach(el => el.classList.toggle('on', selected.has(el.dataset.k)));
       updateCount();
+      if (selected.size) clearInvalid(cal);
     },
   });
+  form.addEventListener('input', e => clearInvalid(e.target));
+  form.addEventListener('change', e => clearInvalid(e.target));
   form.querySelectorAll('[data-nav]').forEach(btn => btn.addEventListener('click', () => {
     weekOffset = Math.max(0, weekOffset + +btn.dataset.nav * 4);
     drawCal();
@@ -335,15 +364,28 @@ function renderCreate() {
     const err = $('#err');
     const title = form.title.value.trim();
     const start = +form.start.value, end = +form.end.value;
-    if (!title) { err.textContent = t('errTitle'); form.title.focus(); return; }
-    if (!selected.size) { err.textContent = t('errDays'); return; }
-    if (end <= start) { err.textContent = t('errTime'); return; }
     const description = form.description.value.trim();
     const contact = {};
     const email = form.email.value.trim(), phone = form.phone.value.trim(), url = normalizeUrl(form.url.value);
-    if (email && !EMAIL_RE.test(email)) { err.textContent = t('errEmail'); form.email.focus(); return; }
-    if (phone && phoneDigits(phone).replace('+', '').length < 6) { err.textContent = t('errPhone'); form.phone.focus(); return; }
-    if (url === null) { err.textContent = t('errUrl'); form.url.focus(); return; }
+
+    // Controlla tutto insieme: ogni campo da sistemare riceve l'asterisco rosso,
+    // il messaggio descrive il primo.
+    const problems = [];
+    if (!title) problems.push([form.title, t('errTitle')]);
+    if (!selected.size) problems.push([cal, t('errDays')]);
+    if (end <= start) problems.push([form.end, t('errTime')]);
+    if (email && !EMAIL_RE.test(email)) problems.push([form.email, t('errEmail')]);
+    if (phone && phoneDigits(phone).replace('+', '').length < 6) problems.push([form.phone, t('errPhone')]);
+    if (url === null) problems.push([form.url, t('errUrl')]);
+    resetInvalid(form);
+    if (problems.length) {
+      problems.forEach(([el]) => markInvalid(el));
+      if (problems.some(([el]) => el.closest('.f-extra'))) form.querySelector('.f-extra').open = true;
+      err.textContent = problems[0][1];
+      if (problems[0][0] !== cal) problems[0][0].focus({ preventScroll: true });
+      err.scrollIntoView({ block: 'nearest' });
+      return;
+    }
     if (email) contact.email = email;
     if (phone) contact.phone = phone;
     if (url) contact.url = url;
@@ -561,17 +603,20 @@ async function renderEvent(id) {
         </form>
         <p class="hint">${t('passwordHint')}</p>
         <p class="error" id="join-err"></p>`;
+      $('#join').addEventListener('input', e => clearInvalid(e.target));
       $('#join').addEventListener('submit', async e => {
         e.preventDefault();
         const form = e.target;
         const name = form.name.value.trim();
         const password = form.password.value;
-        if (!name) return;
+        resetInvalid(form);
+        if (!name) { markInvalid(form.name); form.name.focus(); return; }
         const btn = form.querySelector('button');
         btn.disabled = true;
         try {
           if (!(await store.checkPassword(id, name, password))) {
             $('#join-err').textContent = password ? t('errWrongPw') : t('errProtected');
+            markInvalid(form.password);
             form.password.focus();
             return;
           }

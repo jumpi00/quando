@@ -149,8 +149,10 @@ input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focu
 .btn.small { padding: 5px 10px; font-size: 13px; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: inherit; }
 .error {
-  display: inline-block;
-  margin: 8px 0 0;
+  display: block;
+  width: fit-content;
+  margin: 10px 0 0;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
   padding: 5px 12px;
   border-radius: 999px;
   background: var(--danger-soft);
@@ -160,7 +162,13 @@ input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focu
   line-height: 1.4;
 }
 .error:empty { display: none; }
-.error { align-self: flex-start; max-width: 100%; }
+
+/* Campi da sistemare: asterisco rosso accanto all'etichetta e bordo rosso */
+.field.invalid > span:first-child::after,
+.field.invalid .label::after { content: '*'; color: var(--danger); font-weight: 600; margin-left: 3px; }
+.is-invalid { border-color: var(--danger) !important; }
+.field.invalid .cal { outline: 1px solid var(--danger); outline-offset: 4px; border-radius: 10px; }
+.error { align-self: flex-start; max-width: 100%; scroll-margin: 24px; }
 
 /* Vista di gruppo disabilitata finché non si entra con il proprio nome */
 .card.locked .chips,

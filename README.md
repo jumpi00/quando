@@ -11,6 +11,10 @@ Un When2meet essenziale: crei un evento, mandi il link, ognuno segna quando è l
 - Aggiornamento in tempo reale quando qualcuno risponde.
 - Fuso orario: chi crea l'evento lo sceglie, chi risponde vede gli orari convertiti nel proprio fuso (modificabile).
 - Descrizione dell'evento e contatti dell'organizzatore cliccabili (email, telefono/WhatsApp, link), facoltativi.
+- Link di gestione per l'organizzatore: conferma l'orario finale, che tutti possono aggiungere a Google Calendar, Outlook o Apple (.ics).
+- Accessibile da tastiera (frecce + spazio) e con screen reader.
+- Banner per connessione assente o database non raggiungibile; scadenza dell'evento visibile.
+- Informativa privacy (`privacy.js`), favicon ⏱️ e anteprima per i link condivisi (`og.png`).
 - Lingua: si apre nella lingua del dispositivo (IT, EN, ES, FR, DE; altrimenti inglese), con selettore in alto.
 
 Sito statico (HTML/CSS/JS, nessuna build) + [Supabase](https://supabase.com) gratuito come database.
@@ -28,7 +32,7 @@ Apri http://localhost:5173. Senza Supabase configurato l'app gira in **modalità
 ### 1. Database (Supabase, ~5 minuti)
 
 1. Crea un account e un nuovo progetto su supabase.com (piano Free).
-2. Vai su **SQL Editor → New query**, incolla il contenuto di `sql/001-schema.sql` e premi **Run**. Ripeti con `sql/002-password.sql` `sql/003-description-contact.sql` e `sql/004-cleanup.sql`.
+2. Vai su **SQL Editor → New query**, incolla il contenuto di `sql/001-schema.sql` e premi **Run**. Ripeti con `sql/002-password.sql` `sql/003-description-contact.sql`, `sql/004-cleanup.sql` e `sql/005-organizer-final.sql`.
 3. Vai su **Project Settings → API** e copia **Project URL** e la chiave **anon public**.
 4. Incollale in `config.js`.
 
@@ -49,6 +53,7 @@ La chiave `anon` è pensata per stare nel codice pubblico. Come su When2meet, ch
 | `app.js` | Pagine "crea evento" ed "evento", griglie, classifica |
 | `i18n.js` | Traduzioni (per aggiungere una lingua, copia il blocco `en`) |
 | `tz.js` | Conversioni di fuso orario |
+| `privacy.js` | Informativa privacy (IT/EN) |
 | `store.js` | Salvataggio dati: Supabase oppure localStorage |
 | `config.js` | Chiavi Supabase |
 | `sql/` | Schema del database, da eseguire in ordine |

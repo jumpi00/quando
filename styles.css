@@ -282,3 +282,57 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus { border-co
 }
 .theme-switch button[aria-pressed="true"] { background: var(--cell); color: var(--text); font-weight: 500; }
 .footer code { font-family: var(--mono); }
+
+/* --- Desktop: tutto nello schermo, senza scroll della pagina ------------------
+   Su telefono, tablet o finestre basse resta lo scorrimento normale. */
+@media (min-width: 1024px) and (min-height: 660px) {
+  body { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar, .container { max-width: 1320px; width: 100%; }
+  .topbar { flex: none; padding-top: 14px; padding-bottom: 14px; }
+  #app { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .footer { flex: none; padding-top: 16px; padding-bottom: 14px; }
+  .footer-row { padding-top: 12px; }
+  .footer-note { margin-bottom: 8px; }
+
+  /* Crea evento: campi a sinistra, calendario a destra */
+  .create-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .hero { flex: none; padding: 4px 0 18px; }
+  .create-layout { flex: 1; min-height: 0; max-width: none; padding-bottom: 0; }
+  .create-form {
+    height: 100%;
+    max-height: 640px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-rows: auto auto auto 1fr;
+    grid-template-areas: "title cal" "times cal" "tz cal" "submit cal";
+    gap: 20px 36px;
+  }
+  .create-form.stack > * + * { margin-top: 0; }
+  .f-title { grid-area: title; }
+  .f-times { grid-area: times; }
+  .f-tz { grid-area: tz; }
+  .f-submit { grid-area: submit; }
+  .f-cal { grid-area: cal; min-height: 0; }
+  .f-cal .cal { flex: 1; min-height: 0; grid-template-rows: auto repeat(5, minmax(0, 1fr)); }
+  .f-cal .cal-day { aspect-ratio: auto; min-height: 0; }
+
+  /* Pagina evento: tre colonne che riempiono l'altezza */
+  .event-page {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(280px, 340px);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 16px 20px;
+  }
+  .event-head { grid-column: 1 / -1; padding: 0; }
+  .event-head h1 { font-size: 28px; }
+  .event-cols { display: contents; }
+  .event-page .card { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .event-page .grid-wrap { flex: 1; min-height: 0; margin-top: 10px; }
+  .event-page .grid { height: 100%; grid-template-rows: auto repeat(var(--rows), minmax(0, 1fr)); }
+  .event-page .g-cell, .event-page .g-empty { height: auto; min-height: 0; }
+  .event-page .hover-info { flex: none; }
+  .best { margin: 0; overflow-y: auto; }
+  .best li { gap: 10px; }
+}

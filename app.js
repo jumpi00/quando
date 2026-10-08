@@ -169,17 +169,18 @@ function renderCreate() {
     .map(h => `<option value="${h * 60}"${h === sel ? ' selected' : ''}>${pad(h)}:00</option>`).join('');
 
   app.innerHTML = `
+    <div class="create-page">
     <section class="hero">
       <h1>${t('heroTitle')}</h1>
       <p>${t('heroText')}</p>
     </section>
     <div class="create-layout">
-      <form class="card stack" id="create" novalidate>
-        <label class="field">
+      <form class="card stack create-form" id="create" novalidate>
+        <label class="field f-title">
           <span>${t('eventName')}</span>
           <input type="text" name="title" placeholder="${esc(t('eventNamePh'))}" maxlength="120" autocomplete="off">
         </label>
-        <div class="field">
+        <div class="field f-cal">
           <div class="row-between">
             <span class="label">${t('days')}</span>
             <div class="cal-nav">
@@ -192,7 +193,7 @@ function renderCreate() {
           <div class="cal" id="cal"></div>
           <p class="hint" id="cal-count"></p>
         </div>
-        <div class="field-row">
+        <div class="field-row f-times">
           <label class="field"><span>${t('from')}</span><select name="start">${hourOptions(9, 0, 23)}</select></label>
           <label class="field"><span>${t('to')}</span><select name="end">${hourOptions(18, 1, 24)}</select></label>
           <label class="field"><span>${t('interval')}</span>
@@ -201,15 +202,16 @@ function renderCreate() {
             </select>
           </label>
         </div>
-        <label class="field">
+        <label class="field f-tz">
           <span>${t('timezone')}</span>
           <select name="tz">${timeZoneOptions(deviceTz)}</select>
         </label>
-        <div>
+        <div class="f-submit">
           <button class="btn primary" type="submit">${t('create')}</button>
           <p class="error" id="err"></p>
         </div>
       </form>
+    </div>
     </div>`;
 
   const cal = $('#cal');
@@ -335,6 +337,7 @@ async function renderEvent(id) {
   let minDuration = durOptions.includes(60) ? 60 : durOptions[0] ?? slot;
 
   app.innerHTML = `
+    <div class="event-page">
     <header class="event-head">
       <div>
         <a href="#/" class="back">${t('newEvent')}</a>
@@ -370,7 +373,8 @@ async function renderEvent(id) {
         </label>
       </div>
       <ol id="best-list"></ol>
-    </section>`;
+    </section>
+    </div>`;
 
   $('#view-tz').addEventListener('change', e => {
     prefs.set('tz', e.target.value);
@@ -388,7 +392,7 @@ async function renderEvent(id) {
     pageStart = Math.max(0, Math.min(pageStart, dates.length - perPage));
     return dates.slice(pageStart, pageStart + perPage);
   }
-  const gridCols = () => `grid-template-columns: 52px repeat(${visibleDates().length}, minmax(0, 1fr))`;
+  const gridCols = () => `grid-template-columns: 52px repeat(${visibleDates().length}, minmax(0, 1fr)); --rows: ${times.length}`;
   function renderPagers() {
     const shown = visibleDates();
     const html = dates.length > perPage

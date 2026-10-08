@@ -1,4 +1,4 @@
--- Esegui questo script una volta in Supabase → SQL Editor → New query → Run.
+-- Esegui questo script una volta (primo setup) in Supabase → SQL Editor → New query → Run.
 
 create table if not exists public.events (
   id            text primary key,

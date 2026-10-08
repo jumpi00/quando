@@ -29,7 +29,18 @@ function localBackend() {
     async listResponses(eventId) {
       return Object.values(read('quando:responses')[eventId] ?? {});
     },
-    async saveResponse(eventId, name, slots) {
+    async checkPassword(eventId, name, password) {
+      const secret = read('quando:secrets')[eventId]?.[name];
+      return !secret || secret === password;
+    },
+    async saveResponse(eventId, name, password, slots) {
+      if (!(await this.checkPassword(eventId, name, password))) throw new Error('Password errata');
+      if (password) {
+        const secrets = read('quando:secrets');
+        secrets[eventId] ??= {};
+        secrets[eventId][name] ??= password;
+        write('quando:secrets', secrets);
+      }
       const all = read('quando:responses');
       all[eventId] ??= {};
       all[eventId][name] = { name, slots, updated_at: new Date().toISOString() };
@@ -61,11 +72,11 @@ async function supabaseBackend() {
     async listResponses(eventId) {
       return check(await db.from('responses').select('name, slots, updated_at').eq('event_id', eventId));
     },
-    async saveResponse(eventId, name, slots) {
-      check(await db.from('responses').upsert(
-        { event_id: eventId, name, slots, updated_at: new Date().toISOString() },
-        { onConflict: 'event_id,name' },
-      ));
+    async checkPassword(eventId, name, password) {
+      return check(await db.rpc('check_password', { p_event_id: eventId, p_name: name, p_password: password }));
+    },
+    async saveResponse(eventId, name, password, slots) {
+      check(await db.rpc('save_response', { p_event_id: eventId, p_name: name, p_password: password, p_slots: slots }));
     },
     subscribe(eventId, cb) {
       const channel = db.channel(`responses:${eventId}`)

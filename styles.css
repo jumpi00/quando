@@ -87,7 +87,7 @@ button, input, select { font: inherit; color: inherit; }
 .field > span, .label { font-size: 13px; font-weight: 500; }
 .field-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 @media (max-width: 520px) { .field-row { grid-template-columns: 1fr 1fr; } }
-input[type="text"], select {
+input[type="text"], input[type="password"], select {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -95,7 +95,7 @@ input[type="text"], select {
   padding: 9px 11px;
   outline: none;
 }
-input[type="text"]:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+input[type="text"]:focus, input[type="password"]:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   border: 1px solid var(--border);
@@ -157,7 +157,8 @@ input[type="text"]:focus, select:focus { border-color: var(--accent); box-shadow
 .event-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
 @media (max-width: 900px) { .event-cols { grid-template-columns: 1fr; } }
 .card h2 + .hint { margin-top: 2px; }
-.join { display: flex; gap: 8px; margin-top: 14px; }
+.join-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; margin-top: 14px; }
+@media (max-width: 520px) { .join-form { grid-template-columns: 1fr; } }
 .status { font-size: 12px; color: var(--muted); min-height: 1.5em; margin: 8px 0 0; }
 
 /* Availability grid */

@@ -7,6 +7,7 @@ Un When2meet essenziale: crei un evento, mandi il link, ognuno segna quando è l
 - Heatmap di gruppo con dettaglio "chi c'è / chi manca".
 - Filtro per persone: escludi qualcuno dal calcolo con un clic.
 - Classifica degli orari migliori con durata minima.
+- Password facoltativa per partecipante, per modificare la propria risposta da qualsiasi dispositivo.
 - Aggiornamento in tempo reale quando qualcuno risponde.
 
 Sito statico (HTML/CSS/JS, nessuna build) + [Supabase](https://supabase.com) gratuito come database.
@@ -24,7 +25,7 @@ Apri http://localhost:5173. Senza Supabase configurato l'app gira in **modalità
 ### 1. Database (Supabase, ~5 minuti)
 
 1. Crea un account e un nuovo progetto su supabase.com (piano Free).
-2. Vai su **SQL Editor → New query**, incolla il contenuto di `supabase.sql` e premi **Run**.
+2. Vai su **SQL Editor → New query**, incolla il contenuto di `sql/001-schema.sql` e premi **Run**. Ripeti con `sql/002-password.sql`.
 3. Vai su **Project Settings → API** e copia **Project URL** e la chiave **anon public**.
 4. Incollale in `config.js`.
 
@@ -45,9 +46,10 @@ La chiave `anon` è pensata per stare nel codice pubblico. Come su When2meet, ch
 | `app.js` | Pagine "crea evento" ed "evento", griglie, classifica |
 | `store.js` | Salvataggio dati: Supabase oppure localStorage |
 | `config.js` | Chiavi Supabase |
-| `supabase.sql` | Schema del database |
+| `sql/` | Schema del database, da eseguire in ordine |
 
 ## Limiti attuali
 
 - Gli orari sono nel fuso di chi crea l'evento (mostrato in pagina).
-- Nessuna password per partecipante: chi conosce il link può modificare la risposta di un altro scrivendo lo stesso nome.
+- Chi risponde senza password può essere modificato da chiunque scriva lo stesso nome.
+- Una password dimenticata non si recupera (si può cancellare la riga da Supabase → Table Editor → `response_secrets`).

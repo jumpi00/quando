@@ -37,10 +37,16 @@ const recent = {
   },
 };
 
-const myName = {
-  get(eventId) { try { return localStorage.getItem(`quando:name:${eventId}`) || ''; } catch { return ''; } },
-  set(eventId, name) {
-    try { name ? localStorage.setItem(`quando:name:${eventId}`, name) : localStorage.removeItem(`quando:name:${eventId}`); } catch {}
+// Chi sta rispondendo a un evento su questo dispositivo (nome + password facoltativa).
+const session = {
+  get(eventId) {
+    try { return JSON.parse(localStorage.getItem(`quando:me:${eventId}`)) ?? { name: '', password: '' }; }
+    catch { return { name: '', password: '' }; }
+  },
+  set(eventId, value) {
+    try {
+      value ? localStorage.setItem(`quando:me:${eventId}`, JSON.stringify(value)) : localStorage.removeItem(`quando:me:${eventId}`);
+    } catch {}
   },
 };
 
@@ -272,7 +278,7 @@ async function renderEvent(id) {
   recent.add({ id, title: ev.title, subtitle });
 
   let responses = await store.listResponses(id);
-  let me = myName.get(id);
+  let { name: me, password: myPassword } = session.get(id);
   let mySlots = new Set(responses.find(r => r.name === me)?.slots ?? []);
   const excluded = new Set();
   const durOptions = [30, 60, 90, 120, 180].filter(d => d >= ev.slot_minutes && d <= ev.end_minute - ev.start_minute);
@@ -347,27 +353,52 @@ async function renderEvent(id) {
     if (!me) {
       mine.innerHTML = `
         <h2>La tua disponibilità</h2>
-        <p class="hint">Inserisci il tuo nome per indicare quando sei libero. Se hai già risposto, usa lo stesso nome per modificare.</p>
-        <form class="join" id="join">
-          <input type="text" name="name" placeholder="Il tuo nome" maxlength="40" autocomplete="name" required>
+        <p class="hint">Inserisci il tuo nome per indicare quando sei libero. Se hai già risposto, rientra con lo stesso nome e password.</p>
+        <form class="join-form" id="join">
+          <label class="field"><span>Nome</span>
+            <input type="text" name="name" maxlength="40" autocomplete="username" required>
+          </label>
+          <label class="field"><span>Password <span class="muted">(facoltativa)</span></span>
+            <input type="password" name="password" maxlength="72" autocomplete="current-password">
+          </label>
           <button class="btn primary">Continua</button>
-        </form>`;
-      $('#join').addEventListener('submit', e => {
+        </form>
+        <p class="hint">Con una password solo tu potrai modificare la tua risposta, anche da un altro dispositivo.</p>
+        <p class="error" id="join-err"></p>`;
+      $('#join').addEventListener('submit', async e => {
         e.preventDefault();
-        const name = e.target.name.value.trim();
+        const form = e.target;
+        const name = form.name.value.trim();
+        const password = form.password.value;
         if (!name) return;
-        me = name;
-        myName.set(id, me);
-        mySlots = new Set(responses.find(r => r.name === me)?.slots ?? []);
-        renderMine();
-        renderGroup();
+        const btn = form.querySelector('button');
+        btn.disabled = true;
+        try {
+          if (!(await store.checkPassword(id, name, password))) {
+            $('#join-err').textContent = password
+              ? 'Password errata per questo nome.'
+              : 'Questo nome è protetto da password: inseriscila per modificare la risposta.';
+            form.password.focus();
+            return;
+          }
+          me = name;
+          myPassword = password;
+          session.set(id, { name, password });
+          mySlots = new Set(responses.find(r => r.name === me)?.slots ?? []);
+          renderMine();
+          renderGroup();
+        } catch (ex) {
+          $('#join-err').textContent = `Errore: ${ex.message ?? ex}`;
+        } finally {
+          btn.disabled = false;
+        }
       });
       return;
     }
     mine.innerHTML = `
       <div class="row-between">
         <h2>La tua disponibilità</h2>
-        <span class="muted">${esc(me)} · <button class="link-btn" id="change-name">non sei tu?</button></span>
+        <span class="muted">${myPassword ? '<span title="Protetto da password">🔒</span> ' : ''}${esc(me)} · <button class="link-btn" id="change-name">esci</button></span>
       </div>
       <p class="hint">Trascina sulle caselle in cui sei libero. Trascina di nuovo per togliere.</p>
       <div class="grid-wrap"><div class="grid paint" id="my-grid" style="${gridCols}">${gridHTML()}</div></div>
@@ -382,7 +413,8 @@ async function renderEvent(id) {
     });
     $('#change-name').addEventListener('click', () => {
       me = '';
-      myName.set(id, '');
+      myPassword = '';
+      session.set(id, null);
       renderMine();
       renderGroup();
     });
@@ -395,7 +427,7 @@ async function renderEvent(id) {
     saveTimer = setTimeout(async () => {
       const name = me, slots = [...mySlots].sort();
       try {
-        await store.saveResponse(id, name, slots);
+        await store.saveResponse(id, name, myPassword, slots);
         const existing = responses.find(r => r.name === name);
         if (existing) existing.slots = slots;
         else responses.push({ name, slots });

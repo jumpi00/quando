@@ -55,7 +55,8 @@ La chiave `anon` è pensata per stare nel codice pubblico. Come su When2meet, ch
 
 ## Limiti attuali
 
-- Gli eventi vengono cancellati automaticamente 30 giorni dopo l'ultima data (`sql/004-cleanup.sql`).
+- Gli eventi vengono cancellati automaticamente il giorno dopo la loro ultima data, nel fuso dell'evento (`sql/004-cleanup.sql`).
+- `.github/workflows/keepalive.yml` legge dal database ogni 3 giorni per evitare la pausa del piano gratuito di Supabase. GitHub sospende i workflow programmati dopo 60 giorni senza commit: in quel caso basta riattivarlo dalla scheda Actions.
 
 - Chi risponde senza password può essere modificato da chiunque scriva lo stesso nome.
 - Una password dimenticata non si recupera (si può cancellare la riga da Supabase → Table Editor → `response_secrets`).

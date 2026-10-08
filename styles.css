@@ -56,7 +56,8 @@ h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 h1 { font-size: clamp(24px, 4vw, 34px); line-height: 1.15; }
 h2 { font-size: 17px; }
 a { color: inherit; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+textarea { resize: vertical; min-height: 64px; }
 
 .container { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
 .muted { color: var(--muted); }
@@ -89,7 +90,7 @@ button, input, select { font: inherit; color: inherit; }
 .field > span, .label { font-size: 13px; font-weight: 500; }
 .field-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 @media (max-width: 520px) { .field-row { grid-template-columns: 1fr 1fr; } }
-input[type="text"], input[type="password"], select {
+input[type="text"], input[type="password"], input[type="email"], input[type="tel"], textarea, select {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -97,7 +98,7 @@ input[type="text"], input[type="password"], select {
   padding: 9px 11px;
   outline: none;
 }
-input[type="text"]:focus, input[type="password"]:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focus, input[type="tel"]:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   border: 1px solid var(--border);
@@ -114,6 +115,28 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus { border-co
 .btn.small { padding: 5px 10px; font-size: 13px; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: inherit; }
 .error { color: var(--danger); font-size: 13px; min-height: 1em; margin: 0; }
+
+/* Descrizione e contatti */
+.f-extra summary { cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); }
+.f-extra summary:hover { color: var(--text); }
+.f-extra[open] summary { color: var(--text); margin-bottom: 12px; }
+.extra-fields { display: flex; flex-direction: column; gap: 14px; }
+.contact-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+@media (max-width: 640px) { .contact-fields { grid-template-columns: 1fr; } }
+.event-desc { margin: 8px 0 0; max-width: 70ch; white-space: pre-line; overflow-wrap: anywhere; }
+.contacts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.contact {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 11px 4px 9px;
+  color: var(--text);
+  text-decoration: none;
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.contact svg { flex: none; color: var(--accent); }
+.contact:hover { border-color: var(--accent); background: var(--accent-soft); }
 
 /* Create page */
 .create-layout { max-width: 760px; padding-bottom: 40px; }
@@ -300,11 +323,12 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus { border-co
   .create-layout { flex: 1; min-height: 0; max-width: none; padding-bottom: 0; }
   .create-form {
     height: 100%;
-    max-height: 640px;
+    max-height: 720px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
-    grid-template-rows: auto auto auto 1fr;
-    grid-template-areas: "title cal" "times cal" "tz cal" "submit cal";
+    grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas: "title cal" "times cal" "tz cal" "extra cal" "submit cal";
+    overflow-y: auto;
     gap: 20px 36px;
   }
   .create-form.stack > * + * { margin-top: 0; }
@@ -312,6 +336,8 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus { border-co
   .f-times { grid-area: times; }
   .f-tz { grid-area: tz; }
   .f-submit { grid-area: submit; }
+  .f-extra { grid-area: extra; }
+  .f-cal { max-height: 560px; }
   .f-cal { grid-area: cal; min-height: 0; }
   .f-cal .cal { flex: 1; min-height: 0; grid-template-rows: auto repeat(5, minmax(0, 1fr)); }
   .f-cal .cal-day { aspect-ratio: auto; min-height: 0; }

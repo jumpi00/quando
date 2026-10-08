@@ -10,6 +10,7 @@ Un When2meet essenziale: crei un evento, mandi il link, ognuno segna quando è l
 - Password facoltativa per partecipante, per modificare la propria risposta da qualsiasi dispositivo.
 - Aggiornamento in tempo reale quando qualcuno risponde.
 - Fuso orario: chi crea l'evento lo sceglie, chi risponde vede gli orari convertiti nel proprio fuso (modificabile).
+- Descrizione dell'evento e contatti dell'organizzatore cliccabili (email, telefono/WhatsApp, link), facoltativi.
 - Lingua: si apre nella lingua del dispositivo (IT, EN, ES, FR, DE; altrimenti inglese), con selettore in alto.
 
 Sito statico (HTML/CSS/JS, nessuna build) + [Supabase](https://supabase.com) gratuito come database.
@@ -27,7 +28,7 @@ Apri http://localhost:5173. Senza Supabase configurato l'app gira in **modalità
 ### 1. Database (Supabase, ~5 minuti)
 
 1. Crea un account e un nuovo progetto su supabase.com (piano Free).
-2. Vai su **SQL Editor → New query**, incolla il contenuto di `sql/001-schema.sql` e premi **Run**. Ripeti con `sql/002-password.sql`.
+2. Vai su **SQL Editor → New query**, incolla il contenuto di `sql/001-schema.sql` e premi **Run**. Ripeti con `sql/002-password.sql` e `sql/003-description-contact.sql`.
 3. Vai su **Project Settings → API** e copia **Project URL** e la chiave **anon public**.
 4. Incollale in `config.js`.
 

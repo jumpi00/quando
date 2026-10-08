@@ -36,6 +36,49 @@ function fmtDateRange(dates) {
   return `${F.dayMonth.format(parseDate(dates[0]))} – ${F.dayMonth.format(parseDate(dates.at(-1)))} · ${t('nDays', dates.length)}`;
 }
 
+// --- Contatti dell'organizzatore ----------------------------------------------
+const EMAIL_RE = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
+const phoneDigits = phone => String(phone ?? '').replace(/(?!^\+)[^\d]/g, '');
+
+function normalizeUrl(raw) {
+  const value = String(raw ?? '').trim();
+  if (!value) return '';
+  try {
+    const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+  } catch { return null; }
+}
+
+const icon = path => `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+const ICONS = {
+  email: icon('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>'),
+  phone: icon('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
+  whatsapp: icon('<path d="M3 21l1.7-5A8.5 8.5 0 1 1 8 19.3z"/><path d="M9 10c.5 2 2 3.5 4 4l1.2-1.2 2 .9c-.3 1.1-1.2 1.8-2.3 1.8C10.8 15.5 8.5 13.2 8.5 10.1c0-1.1.7-2 1.8-2.3l.9 2z"/>'),
+  link: icon('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
+};
+
+// Link cliccabili; i valori vengono ricontrollati qui perché arrivano dal database.
+function contactLinks(contact) {
+  if (!contact || typeof contact !== 'object') return '';
+  const items = [];
+  if (EMAIL_RE.test(contact.email ?? '')) {
+    items.push(`<a class="contact" href="mailto:${esc(contact.email)}">${ICONS.email}${esc(contact.email)}</a>`);
+  }
+  const digits = phoneDigits(contact.phone);
+  if (digits.replace('+', '').length >= 6) {
+    items.push(`<a class="contact" href="tel:${esc(digits)}">${ICONS.phone}${esc(contact.phone)}</a>`);
+    if (digits.startsWith('+')) {
+      items.push(`<a class="contact" href="https://wa.me/${digits.slice(1)}" target="_blank" rel="noopener">${ICONS.whatsapp}WhatsApp</a>`);
+    }
+  }
+  const url = normalizeUrl(contact.url);
+  if (url) {
+    const shown = url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+    items.push(`<a class="contact" href="${esc(url)}" target="_blank" rel="noopener">${ICONS.link}${esc(shown)}</a>`);
+  }
+  return items.length ? `<div class="contacts"><span>${t('contactOrganizer')}</span>${items.join('')}</div>` : '';
+}
+
 const prefs = {
   get(key, fallback) { try { return localStorage.getItem(`quando:${key}`) || fallback; } catch { return fallback; } },
   set(key, value) { try { localStorage.setItem(`quando:${key}`, value); } catch {} },
@@ -206,6 +249,24 @@ function renderCreate() {
           <span>${t('timezone')}</span>
           <select name="tz">${timeZoneOptions(deviceTz)}</select>
         </label>
+        <details class="f-extra">
+          <summary>${t('moreDetails')}</summary>
+          <div class="extra-fields">
+            <label class="field">
+              <span>${t('description')}</span>
+              <textarea name="description" rows="3" maxlength="500" placeholder="${esc(t('descriptionPh'))}"></textarea>
+            </label>
+            <div class="field">
+              <span class="label">${t('contacts')}</span>
+              <p class="hint">${t('contactsHint')}</p>
+              <div class="contact-fields">
+                <input type="email" name="email" placeholder="${esc(t('email'))}" autocomplete="email" maxlength="120">
+                <input type="tel" name="phone" placeholder="${esc(t('phonePh'))}" autocomplete="tel" maxlength="30">
+                <input type="text" name="url" placeholder="${esc(t('linkPh'))}" autocomplete="url" maxlength="200">
+              </div>
+            </div>
+          </div>
+        </details>
         <div class="f-submit">
           <button class="btn primary" type="submit">${t('create')}</button>
           <p class="error" id="err"></p>
@@ -269,6 +330,15 @@ function renderCreate() {
     if (!title) { err.textContent = t('errTitle'); form.title.focus(); return; }
     if (!selected.size) { err.textContent = t('errDays'); return; }
     if (end <= start) { err.textContent = t('errTime'); return; }
+    const description = form.description.value.trim();
+    const contact = {};
+    const email = form.email.value.trim(), phone = form.phone.value.trim(), url = normalizeUrl(form.url.value);
+    if (email && !EMAIL_RE.test(email)) { err.textContent = t('errEmail'); form.email.focus(); return; }
+    if (phone && phoneDigits(phone).replace('+', '').length < 6) { err.textContent = t('errPhone'); form.phone.focus(); return; }
+    if (url === null) { err.textContent = t('errUrl'); form.url.focus(); return; }
+    if (email) contact.email = email;
+    if (phone) contact.phone = phone;
+    if (url) contact.url = url;
     err.textContent = '';
     const btn = form.querySelector('[type="submit"]');
     btn.disabled = true;
@@ -281,6 +351,9 @@ function renderCreate() {
         end_minute: end,
         slot_minutes: +form.slot.value,
         timezone: form.tz.value,
+        // Inviati solo se compilati, così il sito funziona anche su database senza queste colonne.
+        ...(description && { description }),
+        ...(Object.keys(contact).length && { contact }),
       });
       location.hash = `#/e/${id}`;
     } catch (ex) {
@@ -342,6 +415,8 @@ async function renderEvent(id) {
       <div>
         <a href="#/" class="back">${t('newEvent')}</a>
         <h1>${esc(ev.title)}</h1>
+        ${ev.description ? `<p class="event-desc">${esc(ev.description)}</p>` : ''}
+        ${contactLinks(ev.contact)}
         <p class="meta">${esc(fmtDateRange(dates))} · ${hhmm(times[0])}–${hhmm(times.at(-1) + slot)}</p>
         <label class="tz-pick">
           <span>${t('showTimesIn')}</span>

@@ -3,6 +3,7 @@ export const LANGS = { it: 'Italiano', en: 'English', es: 'Español', fr: 'Fran�
 
 const dict = {
   it: {
+    errName: "Inserisci il tuo nome.",
     errInterval: "L'intervallo è più lungo della fascia oraria scelta.",
     loginToSee: "Inserisci il tuo nome a sinistra per vedere e confrontare le disponibilità del gruppo.",
     moreDetails: "Descrizione e contatti (facoltativi)",
@@ -91,6 +92,7 @@ const dict = {
     missing: names => `Manca: ${names}`,
   },
   en: {
+    errName: "Enter your name.",
     errInterval: "The interval is longer than the selected time range.",
     loginToSee: "Enter your name on the left to see and compare the group's availability.",
     moreDetails: "Description and contacts (optional)",
@@ -179,6 +181,7 @@ const dict = {
     missing: names => `Missing: ${names}`,
   },
   es: {
+    errName: "Escribe tu nombre.",
     errInterval: "El intervalo es más largo que la franja horaria elegida.",
     loginToSee: "Escribe tu nombre a la izquierda para ver y comparar la disponibilidad del grupo.",
     moreDetails: "Descripción y contactos (opcionales)",
@@ -267,6 +270,7 @@ const dict = {
     missing: names => `Falta: ${names}`,
   },
   fr: {
+    errName: "Saisissez votre nom.",
     errInterval: "L'intervalle est plus long que la plage horaire choisie.",
     loginToSee: "Saisissez votre nom à gauche pour voir et comparer les disponibilités du groupe.",
     moreDetails: "Description et contacts (facultatifs)",
@@ -355,6 +359,7 @@ const dict = {
     missing: names => `Manque : ${names}`,
   },
   de: {
+    errName: "Gib deinen Namen ein.",
     errInterval: "Das Intervall ist länger als der gewählte Zeitraum.",
     loginToSee: "Gib links deinen Namen ein, um die Verfügbarkeit der Gruppe zu sehen und zu vergleichen.",
     moreDetails: "Beschreibung und Kontakte (optional)",

@@ -81,30 +81,38 @@ function contactLinks(contact) {
   return items.length ? `<div class="contacts"><span>${t('contactOrganizer')}</span>${items.join('')}</div>` : '';
 }
 
-// Evidenzia un campo da sistemare: bordo rosso sull'input, asterisco sull'etichetta.
-function markInvalid(el) {
-  if (el.matches('input, select, textarea')) el.classList.add('is-invalid');
+// --- Errori dei moduli ---------------------------------------------------------
+// Ogni elemento da sistemare tiene il suo messaggio; il campo che lo contiene
+// mostra l'asterisco rosso e sotto il modulo c'è una pill per ogni messaggio.
+const errorBox = form => form.parentElement.querySelector('.errors');
+
+function showErrors(box, messages) {
+  box.innerHTML = messages.map(m => `<p class="error">${esc(m)}</p>`).join('');
+}
+
+function renderErrors(form) {
+  showErrors(errorBox(form), [...form.querySelectorAll('.is-invalid')].map(el => el.dataset.err));
+}
+
+function markInvalid(el, message) {
+  el.classList.add('is-invalid');
+  el.dataset.err = message;
   el.closest('.field').classList.add('invalid');
 }
 
 function resetInvalid(form) {
   form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
   form.querySelectorAll('.field.invalid').forEach(el => el.classList.remove('invalid'));
+  showErrors(errorBox(form), []);
 }
 
-// Quando l'utente corregge un campo toglie l'evidenziazione; se non resta nulla
-// da sistemare, nasconde anche il messaggio di errore.
+// Quando l'utente corregge un campo, toglie il suo asterisco e la sua pill.
 function clearInvalid(el) {
-  const field = el?.closest?.('.field.invalid');
-  if (!field) return;
+  if (!el?.classList?.contains('is-invalid')) return;
   el.classList.remove('is-invalid');
-  if (field.querySelector('.is-invalid')) return;
-  field.classList.remove('invalid');
-  const form = field.closest('form');
-  if (form && !form.querySelector('.field.invalid')) {
-    const err = form.parentElement.querySelector('.error');
-    if (err) err.textContent = '';
-  }
+  const field = el.closest('.field');
+  if (!field.querySelector('.is-invalid')) field.classList.remove('invalid');
+  renderErrors(el.closest('form'));
 }
 
 const prefs = {
@@ -297,7 +305,7 @@ function renderCreate() {
         </details>
         <div class="f-submit">
           <button class="btn primary" type="submit">${t('create')}</button>
-          <p class="error" id="err"></p>
+          <div class="errors" id="err" role="alert"></div>
         </div>
       </form>
     </div>
@@ -380,9 +388,9 @@ function renderCreate() {
     if (url === null) problems.push([form.url, t('errUrl')]);
     resetInvalid(form);
     if (problems.length) {
-      problems.forEach(([el]) => markInvalid(el));
+      problems.forEach(([el, message]) => markInvalid(el, message));
       if (problems.some(([el]) => el.closest('.f-extra'))) form.querySelector('.f-extra').open = true;
-      err.textContent = problems[0][1];
+      renderErrors(form);
       if (problems[0][0] !== cal) problems[0][0].focus({ preventScroll: true });
       err.scrollIntoView({ block: 'nearest' });
       return;
@@ -390,7 +398,6 @@ function renderCreate() {
     if (email) contact.email = email;
     if (phone) contact.phone = phone;
     if (url) contact.url = url;
-    err.textContent = '';
     const btn = form.querySelector('[type="submit"]');
     btn.disabled = true;
     btn.textContent = t('creating');
@@ -408,7 +415,7 @@ function renderCreate() {
       });
       location.hash = `#/e/${id}`;
     } catch (ex) {
-      err.textContent = `${t('errCreate')} ${ex.message ?? ex}`;
+      showErrors(err, [`${t('errCreate')} ${ex.message ?? ex}`]);
       btn.disabled = false;
       btn.textContent = t('create');
     }
@@ -607,7 +614,7 @@ async function renderEvent(id) {
           <button class="btn primary">${t('continue')}</button>
         </form>
         <p class="hint">${t('passwordHint')}</p>
-        <p class="error" id="join-err"></p>`;
+        <div class="errors" id="join-err" role="alert"></div>`;
       $('#join').addEventListener('input', e => clearInvalid(e.target));
       $('#join').addEventListener('submit', async e => {
         e.preventDefault();
@@ -615,13 +622,13 @@ async function renderEvent(id) {
         const name = form.name.value.trim();
         const password = form.password.value;
         resetInvalid(form);
-        if (!name) { markInvalid(form.name); form.name.focus(); return; }
+        if (!name) { markInvalid(form.name, t('errName')); renderErrors(form); form.name.focus(); return; }
         const btn = form.querySelector('button');
         btn.disabled = true;
         try {
           if (!(await store.checkPassword(id, name, password))) {
-            $('#join-err').textContent = password ? t('errWrongPw') : t('errProtected');
-            markInvalid(form.password);
+            markInvalid(form.password, password ? t('errWrongPw') : t('errProtected'));
+            renderErrors(form);
             form.password.focus();
             return;
           }
@@ -632,7 +639,7 @@ async function renderEvent(id) {
           renderMine();
           renderGroup();
         } catch (ex) {
-          $('#join-err').textContent = `${t('error')} ${ex.message ?? ex}`;
+          showErrors($('#join-err'), [`${t('error')} ${ex.message ?? ex}`]);
         } finally {
           btn.disabled = false;
         }

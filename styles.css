@@ -6,6 +6,8 @@
   --border: #e2e2dd;
   --cell: #efefea;
   --cell-alt: #e2e2db;
+  --line-hour: rgba(23, 24, 26, .14);
+  --line-half: rgba(23, 24, 26, .06);
   /* Verde Pantone 802 C (fluo). Sui fondi chiari il neon si usa solo come
      riempimento con testo scuro; testi e icone usano la variante scura. */
   --accent: #44d62c;
@@ -29,6 +31,8 @@
     --border: #2c2d31;
     --cell: #232428;
     --cell-alt: #2e3035;
+    --line-hour: rgba(255, 255, 255, .12);
+    --line-half: rgba(255, 255, 255, .045);
     --accent: #44d62c;
     --accent-ink: #0b1a07;
     --accent-text: #44d62c;
@@ -46,6 +50,8 @@
   --border: #2c2d31;
   --cell: #232428;
   --cell-alt: #2e3035;
+  --line-hour: rgba(255, 255, 255, .12);
+  --line-half: rgba(255, 255, 255, .045);
   --accent: #44d62c;
   --accent-ink: #0b1a07;
   --accent-text: #44d62c;
@@ -230,10 +236,12 @@ input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focu
 .g-cell {
   height: 18px;
   background: var(--cell);
-  border-top: 1px solid var(--surface);
+  /* Griglia piatta: linee semitrasparenti, leggibili sia sul grigio sia sul verde. */
+  border-top: 1px solid var(--line-half);
   cursor: pointer;
 }
-.g-cell.hour { border-top-color: var(--border); }
+.g-cell.hour { border-top-color: var(--line-hour); }
+.g-cell.first { border-top-color: transparent; }
 .g-empty { height: 18px; }
 .grid .gap { margin-top: 14px; }
 .g-cell.first { border-top-left-radius: 6px; border-top-right-radius: 6px; }

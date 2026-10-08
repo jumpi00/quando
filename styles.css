@@ -17,6 +17,8 @@
   --heat: #2f9e1c;
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23676a71' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --danger: #c43d3d;
+  --danger-soft: #fde7e7;
+  --danger-text: #a12424;
   --radius: 12px;
   --font: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --mono: var(--font);
@@ -37,6 +39,8 @@
     --accent-ink: #0b1a07;
     --accent-text: #44d62c;
     --accent-soft: #1c3417;
+    --danger-soft: #3b1f21;
+    --danger-text: #ffb3b3;
     --heat: #44d62c;
     --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a9ca3' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     color-scheme: dark;
@@ -56,6 +60,8 @@
   --accent-ink: #0b1a07;
   --accent-text: #44d62c;
   --accent-soft: #1c3417;
+  --danger-soft: #3b1f21;
+  --danger-text: #ffb3b3;
   --heat: #44d62c;
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a9ca3' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   color-scheme: dark;
@@ -142,7 +148,26 @@ input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focu
 .btn.primary:hover { filter: brightness(1.05); }
 .btn.small { padding: 5px 10px; font-size: 13px; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: inherit; }
-.error { color: var(--danger); font-size: 13px; min-height: 1em; margin: 0; }
+.error {
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--danger-soft);
+  color: var(--danger-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.error:empty { display: none; }
+.error { align-self: flex-start; max-width: 100%; }
+
+/* Vista di gruppo disabilitata finché non si entra con il proprio nome */
+.card.locked .chips,
+.card.locked .legend,
+.card.locked .day-pager,
+.card.locked .grid-wrap { opacity: .4; filter: grayscale(1); pointer-events: none; }
+.card.locked .hover-info { color: var(--text); }
 
 /* Descrizione e contatti */
 .f-extra summary { cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); }

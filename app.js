@@ -617,6 +617,7 @@ async function renderEvent(id) {
 
   function scheduleSave() {
     const status = $('#save-status');
+    status.classList.remove('error');
     status.textContent = t('saving');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
@@ -628,7 +629,11 @@ async function renderEvent(id) {
         else responses.push({ name, slots });
         if ($('#save-status')) $('#save-status').textContent = t('saved');
       } catch (ex) {
-        if ($('#save-status')) $('#save-status').textContent = `${t('saveError')} ${ex.message ?? ex}`;
+        const el = $('#save-status');
+        if (el) {
+          el.classList.add('error');
+          el.textContent = `${t('saveError')} ${ex.message ?? ex}`;
+        }
       }
     }, 500);
   }
@@ -652,6 +657,9 @@ async function renderEvent(id) {
   function renderGroup() {
     const { all, included, byKey } = availability();
     const total = included.length;
+    // Prima di entrare con il proprio nome, la vista di gruppo resta disabilitata.
+    $('#group').classList.toggle('locked', !me);
+    $('#group').toggleAttribute('inert', !me);
 
     $('#group-count').textContent = t('responses', all.length);
     $('#people').innerHTML = all
@@ -676,6 +684,7 @@ async function renderEvent(id) {
 
   function showHover(key, byKey, included) {
     groupGrid.querySelectorAll('.hover').forEach(el => el.classList.remove('hover'));
+    if (!me) { hoverInfo.innerHTML = `🔒 ${t('loginToSee')}`; return; }
     if (!key || !included.length) { hoverInfo.innerHTML = included.length ? t('hoverDefault') : t('noResponses'); return; }
     groupGrid.querySelector(`[data-k="${key}"]`)?.classList.add('hover');
     const { date, min } = L.pos(key);

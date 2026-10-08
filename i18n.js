@@ -3,6 +3,7 @@ export const LANGS = { it: 'Italiano', en: 'English', es: 'Español', fr: 'Fran�
 
 const dict = {
   it: {
+    loginToSee: "Inserisci il tuo nome a sinistra per vedere e confrontare le disponibilità del gruppo.",
     moreDetails: "Descrizione e contatti (facoltativi)",
     description: "Descrizione",
     descriptionPh: "Es. Ordine del giorno, link alla call, cosa preparare…",
@@ -89,6 +90,7 @@ const dict = {
     missing: names => `Manca: ${names}`,
   },
   en: {
+    loginToSee: "Enter your name on the left to see and compare the group's availability.",
     moreDetails: "Description and contacts (optional)",
     description: "Description",
     descriptionPh: "E.g. agenda, call link, what to prepare…",
@@ -175,6 +177,7 @@ const dict = {
     missing: names => `Missing: ${names}`,
   },
   es: {
+    loginToSee: "Escribe tu nombre a la izquierda para ver y comparar la disponibilidad del grupo.",
     moreDetails: "Descripción y contactos (opcionales)",
     description: "Descripción",
     descriptionPh: "Ej. orden del día, enlace a la llamada, qué preparar…",
@@ -261,6 +264,7 @@ const dict = {
     missing: names => `Falta: ${names}`,
   },
   fr: {
+    loginToSee: "Saisissez votre nom à gauche pour voir et comparer les disponibilités du groupe.",
     moreDetails: "Description et contacts (facultatifs)",
     description: "Description",
     descriptionPh: "Ex. ordre du jour, lien de l'appel, quoi préparer…",
@@ -347,6 +351,7 @@ const dict = {
     missing: names => `Manque : ${names}`,
   },
   de: {
+    loginToSee: "Gib links deinen Namen ein, um die Verfügbarkeit der Gruppe zu sehen und zu vergleichen.",
     moreDetails: "Beschreibung und Kontakte (optional)",
     description: "Beschreibung",
     descriptionPh: "z. B. Agenda, Call-Link, was vorzubereiten ist…",

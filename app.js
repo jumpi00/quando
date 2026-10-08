@@ -41,15 +41,8 @@ const prefs = {
   set(key, value) { try { localStorage.setItem(`quando:${key}`, value); } catch {} },
 };
 
-const recent = {
-  list() {
-    try { return JSON.parse(localStorage.getItem('quando:recent')) ?? []; } catch { return []; }
-  },
-  add(item) {
-    const items = [item, ...this.list().filter(i => i.id !== item.id)].slice(0, 8);
-    try { localStorage.setItem('quando:recent', JSON.stringify(items)); } catch {}
-  },
-};
+// Le versioni precedenti salvavano qui un elenco degli eventi aperti: lo cancelliamo.
+try { localStorage.removeItem('quando:recent'); } catch {}
 
 // Chi sta rispondendo a un evento su questo dispositivo (nome + password facoltativa).
 const session = {
@@ -174,10 +167,6 @@ function renderCreate() {
 
   const hourOptions = (sel, from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i)
     .map(h => `<option value="${h * 60}"${h === sel ? ' selected' : ''}>${pad(h)}:00</option>`).join('');
-  const recents = recent.list();
-  const recentSubtitle = r => r.dates
-    ? `${fmtDateRange(r.dates)} · ${hhmm(r.start)}–${hhmm(r.end)}`
-    : r.subtitle ?? '';
 
   app.innerHTML = `
     <section class="hero">
@@ -221,12 +210,6 @@ function renderCreate() {
           <p class="error" id="err"></p>
         </div>
       </form>
-      <aside class="card recent">
-        <h2>${t('yourEvents')}</h2>
-        ${recents.length
-          ? `<ul>${recents.map(r => `<li><a href="#/e/${esc(r.id)}"><b>${esc(r.title)}</b><span>${esc(recentSubtitle(r))}</span></a></li>`).join('')}</ul>`
-          : `<p class="hint">${t('yourEventsEmpty')}</p>`}
-      </aside>
     </div>`;
 
   const cal = $('#cal');
@@ -343,7 +326,6 @@ async function renderEvent(id) {
   const L = buildLayout(ev, viewTz);
   const { dates, times } = L;
   const slot = ev.slot_minutes;
-  recent.add({ id, title: ev.title, dates: ev.dates, start: ev.start_minute, end: ev.end_minute });
 
   let responses = await store.listResponses(id);
   let { name: me, password: myPassword } = session.get(id);

@@ -269,7 +269,7 @@ function renderCreate() {
           <label class="field"><span>${t('to')}</span><select name="end">${hourOptions(18, 1, 24)}</select></label>
           <label class="field"><span>${t('interval')}</span>
             <select name="slot">
-              ${[15, 30, 60].map(m => `<option value="${m}"${m === 30 ? ' selected' : ''}>${fmtDuration(m)}</option>`).join('')}
+              ${[10, 15, 20, 30, 45, 60, 90, 120].map(m => `<option value="${m}"${m === 30 ? ' selected' : ''}>${fmtDuration(m)}</option>`).join('')}
             </select>
           </label>
         </div>
@@ -374,6 +374,7 @@ function renderCreate() {
     if (!title) problems.push([form.title, t('errTitle')]);
     if (!selected.size) problems.push([cal, t('errDays')]);
     if (end <= start) problems.push([form.end, t('errTime')]);
+    else if (end - start < +form.slot.value) problems.push([form.slot, t('errInterval')]);
     if (email && !EMAIL_RE.test(email)) problems.push([form.email, t('errEmail')]);
     if (phone && phoneDigits(phone).replace('+', '').length < 6) problems.push([form.phone, t('errPhone')]);
     if (url === null) problems.push([form.url, t('errUrl')]);
@@ -420,7 +421,8 @@ function renderCreate() {
 function buildLayout(ev, viewTz) {
   const slots = [];
   for (const d of ev.dates) {
-    for (let m = ev.start_minute; m < ev.end_minute; m += ev.slot_minutes) {
+    // Solo slot interi dentro la fascia oraria (es. 2 h tra 9 e 18 → l'ultimo finisce alle 17).
+    for (let m = ev.start_minute; m + ev.slot_minutes <= ev.end_minute; m += ev.slot_minutes) {
       const key = slotKey(d, m);
       const pos = viewTz === ev.timezone ? { date: d, min: m } : utcToZoned(zonedToUtc(d, m, ev.timezone), viewTz);
       slots.push({ key, ...pos });
@@ -456,8 +458,10 @@ async function renderEvent(id) {
   let { name: me, password: myPassword } = session.get(id);
   let mySlots = new Set(responses.find(r => r.name === me)?.slots ?? []);
   const excluded = new Set();
-  const durOptions = [30, 60, 90, 120, 180].filter(d => d >= slot && d <= ev.end_minute - ev.start_minute);
-  let minDuration = durOptions.includes(60) ? 60 : durOptions[0] ?? slot;
+  // Durate minime proposte: multipli dell'intervallo che entrano nella fascia oraria.
+  const durOptions = [...new Set([1, 2, 3, 4, 6, 8].map(k => k * slot))]
+    .filter(d => d <= ev.end_minute - ev.start_minute);
+  let minDuration = durOptions.find(d => d >= 60) ?? durOptions.at(-1) ?? slot;
 
   app.innerHTML = `
     <div class="event-page">
@@ -557,7 +561,8 @@ async function renderEvent(id) {
       // Stacco visivo quando le righe non sono consecutive (es. dopo mezzanotte in un altro fuso).
       const afterGap = r > 0 && m - times[r - 1] !== slot;
       const beforeGap = r < times.length - 1 && times[r + 1] - m !== slot;
-      const onHour = afterGap || (m - times[0]) % 60 === 0;
+      // Con intervalli che non dividono l'ora (45 min, 1 h 30, 2 h) ogni riga ha la sua etichetta.
+      const onHour = afterGap || 60 % slot !== 0 || (m - times[0]) % 60 === 0;
       const gap = afterGap ? ' gap' : '';
       h += `<div class="g-time${gap}">${onHour ? hhmm(m) : ''}</div>`;
       dates.forEach((d, c) => {

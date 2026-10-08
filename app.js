@@ -671,7 +671,7 @@ async function renderEvent(id) {
 
   function heat(ratio) {
     if (ratio <= 0) return 'var(--cell)';
-    return `color-mix(in oklch, var(--accent) ${Math.round(15 + ratio * 85)}%, var(--cell))`;
+    return `color-mix(in oklch, var(--heat) ${Math.round(15 + ratio * 85)}%, var(--cell))`;
   }
 
   function showHover(key, byKey, included) {

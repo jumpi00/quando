@@ -175,7 +175,11 @@ input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focu
 .card.locked .legend,
 .card.locked .day-pager,
 .card.locked .grid-wrap { opacity: .4; filter: grayscale(1); pointer-events: none; }
-.card.locked .hover-info { color: var(--text); }
+.card.locked,
+.card.locked h2,
+.card.locked .hover-info { color: var(--muted); }
+.card.locked h2 { opacity: .7; }
+.card.locked .hover-info { filter: grayscale(1); }
 
 /* Descrizione e contatti */
 .f-extra summary { cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); }

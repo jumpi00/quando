@@ -293,7 +293,13 @@ function renderCreate() {
         const k = isoDate(d);
         const past = k < todayIso;
         const showMonth = d.getDate() === 1 || (r === 0 && c === 0);
-        html += `<div class="cal-day${selected.has(k) ? ' on' : ''}${k === todayIso ? ' today' : ''}"
+        // Mesi alterni con sfondo diverso, per vedere subito dove cambia il mese.
+        const cls = ['cal-day'];
+        if (d.getMonth() % 2) cls.push('m-alt');
+        if (d.getDate() === 1) cls.push('month-start');
+        if (selected.has(k)) cls.push('on');
+        if (k === todayIso) cls.push('today');
+        html += `<div class="${cls.join(' ')}"
           data-k="${k}" data-c="${c}" data-r="${r}"${past ? ' data-off' : ''}>
           ${showMonth ? `<small>${F.month.format(d)}</small>` : ''}${d.getDate()}</div>`;
       }

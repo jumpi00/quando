@@ -319,7 +319,7 @@ input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focu
 .best ol { list-style: none; margin: 14px 0 0; padding: 0; }
 .best li {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 14px;
   padding: 12px 0;
@@ -427,4 +427,71 @@ input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focu
   .event-page .hover-info { flex: none; }
   .best { margin: 0; overflow-y: auto; }
   .best li { gap: 10px; }
+}
+
+/* --- Focus da tastiera -------------------------------------------------------- */
+:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
+.g-cell:focus-visible, .cal-day:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+  position: relative;
+  z-index: 2;
+}
+
+/* --- Stato della connessione --------------------------------------------------- */
+.net-wrap { flex: none; }
+.net-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+.net-banner[hidden] { display: none; }
+
+/* --- Scadenza, orario confermato, organizzatore ------------------------------ */
+.expiry { white-space: nowrap; }
+.head-extras { flex-basis: 100%; display: flex; flex-direction: column; gap: 10px; }
+.head-extras[hidden] { display: none; }
+.final-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px 20px; flex-wrap: wrap;
+  padding: 12px 16px;
+  border: 1px solid var(--accent-text);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.final-when { display: flex; flex-direction: column; gap: 2px; }
+.final-label { font-size: 12px; font-weight: 600; color: var(--accent-text); text-transform: uppercase; letter-spacing: .04em; }
+.final-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.final-actions a.btn { text-decoration: none; }
+.organizer-bar {
+  display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 13px;
+}
+.organizer-bar .hint { margin: 0; flex-basis: 100%; }
+.organizer-bar.highlight { border-color: var(--accent-text); }
+.best li .btn.small { white-space: nowrap; }
+
+/* --- Pagina privacy ------------------------------------------------------------ */
+.prose { max-width: 760px; margin: 0 auto 40px; line-height: 1.6; overflow-y: auto; }
+.prose h1 { font-size: 28px; }
+.prose h2 { font-size: 17px; margin-top: 24px; }
+.prose ul { padding-left: 20px; }
+.prose li + li { margin-top: 6px; }
+@media (min-width: 1024px) and (min-height: 660px) {
+  .prose { margin-bottom: 0; min-height: 0; }
+  #app > .prose { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }

@@ -1,5 +1,6 @@
-import { store, isLocal } from './store.js';
+import { store, isLocal, isConnectionError } from './store.js';
 import { LANGS, lang, setLang, t } from './i18n.js';
+import { privacyHTML } from './privacy.js';
 import { deviceTz, timeZoneOptions, tzName, utcToZoned, zonedToUtc } from './tz.js';
 
 // --- Utilità ----------------------------------------------------------------
@@ -183,6 +184,126 @@ function rectSelect(root, { getSet, setSet, onEnd }) {
   root.addEventListener('pointercancel', stop);
 }
 
+// Navigazione da tastiera nelle griglie (calendario e disponibilità):
+// le frecce spostano il focus tra le caselle, Spazio/Invio seleziona.
+// Una sola casella alla volta è raggiungibile con Tab ("roving tabindex").
+function setRoving(root, cell) {
+  root.querySelectorAll('[data-k][tabindex="0"]').forEach(el => { el.tabIndex = -1; });
+  cell.tabIndex = 0;
+}
+
+function initRoving(root, preferKey) {
+  const cells = [...root.querySelectorAll('[data-k]:not([data-off])')];
+  const target = cells.find(el => el.dataset.k === preferKey) ?? cells.find(el => el.getAttribute('aria-checked') === 'true') ?? cells[0];
+  if (target) target.tabIndex = 0;
+}
+
+function keyboardCells(root, { onToggle, onFocus } = {}) {
+  const moves = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  root.addEventListener('keydown', e => {
+    const cell = e.target.closest?.('[data-k]');
+    if (!cell || !root.contains(cell)) return;
+    if (moves[e.key]) {
+      e.preventDefault();
+      const [dc, dr] = moves[e.key];
+      const cells = [...root.querySelectorAll('[data-k]')];
+      const maxC = Math.max(...cells.map(el => +el.dataset.c)), maxR = Math.max(...cells.map(el => +el.dataset.r));
+      let c = +cell.dataset.c, r = +cell.dataset.r;
+      while (true) {
+        c += dc; r += dr;
+        if (c < 0 || r < 0 || c > maxC || r > maxR) return;
+        const next = root.querySelector(`[data-k][data-c="${c}"][data-r="${r}"]:not([data-off])`);
+        if (next) { setRoving(root, next); next.focus(); return; }
+      }
+    }
+    if ((e.key === ' ' || e.key === 'Enter') && onToggle && !cell.hasAttribute('data-off')) {
+      e.preventDefault();
+      onToggle(cell);
+    }
+  });
+  root.addEventListener('focusin', e => {
+    const cell = e.target.closest?.('[data-k]');
+    if (!cell) return;
+    setRoving(root, cell);
+    onFocus?.(cell);
+  });
+}
+
+// --- Stato della connessione -------------------------------------------------
+// "offline": il dispositivo non ha rete. "down": la rete c'è ma il database non
+// risponde (es. progetto Supabase in pausa o temporaneamente irraggiungibile).
+let netState = 'ok';
+function setNet(state) {
+  netState = state;
+  const banner = $('#net-banner');
+  if (state === 'ok') { banner.hidden = true; banner.innerHTML = ''; return; }
+  banner.hidden = false;
+  banner.innerHTML = `<span>${state === 'offline' ? t('offline') : t('serviceDown')}</span>
+    <button type="button" class="btn small" id="net-retry">${t('retry')}</button>`;
+  $('#net-retry').addEventListener('click', () => route());
+}
+const noteConnection = err => {
+  if (isConnectionError(err)) setNet(navigator.onLine === false ? 'offline' : 'down');
+};
+addEventListener('offline', () => setNet('offline'));
+addEventListener('online', () => {
+  if (netState !== 'ok') { setNet('ok'); dispatchEvent(new Event('whenly:reconnected')); }
+});
+
+// --- Organizzatore e calendario ---------------------------------------------
+const adminKeys = {
+  get(eventId) { try { return localStorage.getItem(`quando:admin:${eventId}`) || ''; } catch { return ''; } },
+  set(eventId, key) {
+    try { key ? localStorage.setItem(`quando:admin:${eventId}`, key) : localStorage.removeItem(`quando:admin:${eventId}`); } catch {}
+  },
+};
+
+const eventLink = id => `${location.origin}${location.pathname}#/e/${id}`;
+const adminLink = (id, key) => `${location.origin}${location.pathname}#/e/${id}/admin/${key}`;
+
+// Orario confermato → istanti UTC di inizio e fine.
+function finalRange(ev) {
+  const [date, time] = ev.final.start.split('T');
+  const [h, m] = time.split(':').map(Number);
+  const start = zonedToUtc(date, h * 60 + m, ev.timezone);
+  return { start, end: start + ev.final.minutes * 60000 };
+}
+
+const icsStamp = ms => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+const icsText = s => String(s).replace(/\\/g, '\\\\').replace(/[;,]/g, m => `\\${m}`).replace(/\r?\n/g, '\\n');
+
+function calendarLinks(ev) {
+  const { start, end } = finalRange(ev);
+  const details = [ev.description, eventLink(ev.id)].filter(Boolean).join('\n\n');
+  const enc = encodeURIComponent;
+  const google = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${enc(ev.title)}&dates=${icsStamp(start)}/${icsStamp(end)}&details=${enc(details)}`;
+  const outlook = `https://outlook.office.com/calendar/action/compose?subject=${enc(ev.title)}&startdt=${enc(new Date(start).toISOString())}&enddt=${enc(new Date(end).toISOString())}&body=${enc(details)}`;
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Whenly//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${ev.id}-${icsStamp(start)}@whenly`,
+    `DTSTAMP:${icsStamp(Date.now())}`,
+    `DTSTART:${icsStamp(start)}`,
+    `DTEND:${icsStamp(end)}`,
+    `SUMMARY:${icsText(ev.title)}`,
+    `DESCRIPTION:${icsText(details)}`,
+    `URL:${eventLink(ev.id)}`,
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+  return { google, outlook, ics };
+}
+
+function downloadIcs(ev) {
+  const blob = new Blob([calendarLinks(ev).ics], { type: 'text/calendar;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${ev.title.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').toLowerCase() || 'whenly'}.ics`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 // --- Router e intestazione -------------------------------------------------
 const app = $('#app');
 let cleanup = () => {};
@@ -193,6 +314,7 @@ function renderChrome() {
   $('#lang').innerHTML = Object.entries(LANGS)
     .map(([code, label]) => `<option value="${code}"${code === lang ? ' selected' : ''}>${label}</option>`).join('');
   $('#footer-note').innerHTML = isLocal ? t('localMode') : '';
+  $('#privacy-link').textContent = t('privacy');
   const theme = prefs.get('theme', 'auto');
   const labels = { auto: t('themeAuto'), light: t('themeLight'), dark: t('themeDark') };
   $('#theme-switch').setAttribute('aria-label', t('theme'));
@@ -217,14 +339,30 @@ async function route() {
   cleanup = () => {};
   buildFormatters();
   renderChrome();
-  const m = location.hash.match(/^#\/e\/([A-Za-z0-9]+)/);
+  // Il link di gestione (#/e/ID/admin/CHIAVE) salva la chiave su questo dispositivo
+  // e poi viene sostituito dal link normale, così non si condivide per sbaglio.
+  const m = location.hash.match(/^#\/e\/([A-Za-z0-9]+)(?:\/admin\/([A-Za-z0-9]+))?/);
+  if (m?.[2]) {
+    adminKeys.set(m[1], m[2]);
+    history.replaceState(null, '', `#/e/${m[1]}`);
+  }
+  document.title = 'Whenly';
   try {
     if (m) await renderEvent(m[1]);
+    else if (location.hash.startsWith('#/privacy')) renderPrivacy();
     else renderCreate();
   } catch (err) {
     console.error(err);
-    app.innerHTML = `<div class="card"><h2>${t('errorTitle')}</h2><p class="muted">${esc(err.message ?? err)}</p><a class="btn" href="#/">${t('backHome')}</a></div>`;
+    noteConnection(err);
+    const title = isConnectionError(err) ? t('connectionTitle') : t('errorTitle');
+    const text = isConnectionError(err) ? (navigator.onLine === false ? t('offline') : t('serviceDown')) : esc(err.message ?? err);
+    app.innerHTML = `<div class="card"><h2>${title}</h2><p class="muted">${text}</p><a class="btn" href="#/">${t('backHome')}</a></div>`;
   }
+}
+
+function renderPrivacy() {
+  document.title = `${t('privacy')} · Whenly`;
+  app.innerHTML = `<article class="card prose">${privacyHTML(lang)}<p><a class="btn" href="#/">${t('backHome')}</a></p></article>`;
 }
 
 $('#lang').addEventListener('change', e => {
@@ -268,9 +406,10 @@ function renderCreate() {
               <button type="button" class="btn" data-nav="1" aria-label="${esc(t('nextWeeks'))}">${CHEVRON_RIGHT}</button>
             </div>
           </div>
-          <p class="hint">${t('daysHint')}</p>
-          <div class="cal" id="cal"></div>
-          <p class="hint" id="cal-count"></p>
+          <p class="hint" id="cal-hint">${t('daysHint')} <span class="sr-only">${t('keyboardHint')}</span></p>
+          <div class="cal" id="cal" role="group" aria-label="${esc(t('days'))}" aria-describedby="cal-hint"></div>
+          <p class="hint" id="cal-count" aria-live="polite"></p>
+          <p class="hint">${t('autoDelete')}</p>
         </div>
         <div class="field-row f-times">
           <label class="field"><span>${t('from')}</span><select name="start">${hourOptions(9, 0, 23)}</select></label>
@@ -333,12 +472,14 @@ function renderCreate() {
         if (d.getDate() === 1) cls.push('month-start');
         if (selected.has(k)) cls.push('on');
         if (k === todayIso) cls.push('today');
-        html += `<div class="${cls.join(' ')}"
+        html += `<div class="${cls.join(' ')}" role="checkbox" tabindex="-1"
+          aria-checked="${selected.has(k)}" aria-label="${esc(cap(F.long.format(d)))}"${past ? ' aria-disabled="true"' : ''}
           data-k="${k}" data-c="${c}" data-r="${r}"${past ? ' data-off' : ''}>
-          ${showMonth ? `<small>${F.month.format(d)}</small>` : ''}${d.getDate()}</div>`;
+          ${showMonth ? `<small aria-hidden="true">${F.month.format(d)}</small>` : ''}${d.getDate()}</div>`;
       }
     }
     cal.innerHTML = html;
+    initRoving(cal, todayIso);
     const end = new Date(start);
     end.setDate(start.getDate() + WEEKS * 7 - 1);
     $('#cal-range').textContent = `${F.dayMonth.format(start)} – ${F.dayMonth.format(end)}`;
@@ -349,14 +490,22 @@ function renderCreate() {
     $('#cal-count').textContent = t('daysSelected', selected.size);
   }
 
-  rectSelect(cal, {
-    getSet: () => selected,
-    setSet: next => {
-      selected.clear();
-      next.forEach(k => selected.add(k));
-      cal.querySelectorAll('[data-k]').forEach(el => el.classList.toggle('on', selected.has(el.dataset.k)));
-      updateCount();
-      if (selected.size) clearInvalid(cal);
+  function setSelected(next) {
+    selected.clear();
+    next.forEach(k => selected.add(k));
+    cal.querySelectorAll('[data-k]').forEach(el => {
+      el.classList.toggle('on', selected.has(el.dataset.k));
+      el.setAttribute('aria-checked', String(selected.has(el.dataset.k)));
+    });
+    updateCount();
+    if (selected.size) clearInvalid(cal);
+  }
+  rectSelect(cal, { getSet: () => selected, setSet: setSelected });
+  keyboardCells(cal, {
+    onToggle: cell => {
+      const next = new Set(selected);
+      next.has(cell.dataset.k) ? next.delete(cell.dataset.k) : next.add(cell.dataset.k);
+      setSelected(next);
     },
   });
   form.addEventListener('input', e => clearInvalid(e.target));
@@ -402,7 +551,7 @@ function renderCreate() {
     btn.disabled = true;
     btn.textContent = t('creating');
     try {
-      const id = await store.createEvent({
+      const { id, adminKey } = await store.createEvent({
         title,
         dates: [...selected].sort(),
         start_minute: start,
@@ -413,9 +562,14 @@ function renderCreate() {
         ...(description && { description }),
         ...(Object.keys(contact).length && { contact }),
       });
+      if (adminKey) {
+        adminKeys.set(id, adminKey);
+        try { sessionStorage.setItem(`quando:created:${id}`, '1'); } catch {}
+      }
       location.hash = `#/e/${id}`;
     } catch (ex) {
-      showErrors(err, [`${t('errCreate')} ${ex.message ?? ex}`]);
+      noteConnection(ex);
+      showErrors(err, [isConnectionError(ex) ? t('serviceDown') : `${t('errCreate')} ${ex.message ?? ex}`]);
       btn.disabled = false;
       btn.textContent = t('create');
     }
@@ -450,7 +604,8 @@ function buildLayout(ev, viewTz) {
 // --- Pagina evento ------------------------------------------------------------
 async function renderEvent(id) {
   app.innerHTML = `<p class="muted">${t('loading')}</p>`;
-  const ev = await store.getEvent(id);
+  let ev = await store.getEvent(id);
+  if (netState === 'down') setNet('ok');
   if (!ev) {
     app.innerHTML = `<div class="card"><h2>${t('notFound')}</h2><p class="muted">${t('notFoundText')}</p><a class="btn" href="#/">${t('createNew')}</a></div>`;
     return;
@@ -461,7 +616,27 @@ async function renderEvent(id) {
   const { dates, times } = L;
   const slot = ev.slot_minutes;
 
+  document.title = `${ev.title} · Whenly`;
   let responses = await store.listResponses(id);
+
+  // Organizzatore: la chiave salvata su questo dispositivo viene verificata dal database.
+  const adminKey = adminKeys.get(id);
+  let isAdmin = false;
+  if (adminKey) {
+    try {
+      isAdmin = await store.checkAdmin(id, adminKey);
+      if (!isAdmin) adminKeys.set(id, '');
+    } catch (err) { noteConnection(err); }
+  }
+  let justCreated = false;
+  try {
+    justCreated = sessionStorage.getItem(`quando:created:${id}`) === '1';
+    sessionStorage.removeItem(`quando:created:${id}`);
+  } catch {}
+
+  // Il link smette di funzionare il giorno dopo l'ultima data (pulizia automatica).
+  const expiry = parseDate(ev.dates.at(-1));
+  expiry.setDate(expiry.getDate() + 1);
   let { name: me, password: myPassword } = session.get(id);
   let mySlots = new Set(responses.find(r => r.name === me)?.slots ?? []);
   const excluded = new Set();
@@ -478,7 +653,8 @@ async function renderEvent(id) {
         <h1>${esc(ev.title)}</h1>
         ${ev.description ? `<p class="event-desc">${esc(ev.description)}</p>` : ''}
         ${contactLinks(ev.contact)}
-        <p class="meta">${esc(fmtDateRange(dates))} · ${hhmm(times[0])}–${hhmm(times.at(-1) + slot)}</p>
+        <p class="meta">${esc(fmtDateRange(dates))} · ${hhmm(times[0])}–${hhmm(times.at(-1) + slot)}
+          · <span class="expiry" title="${esc(t('autoDelete'))}">${esc(t('expiresOn', F.dayMonth.format(expiry)))}</span></p>
         <label class="tz-pick">
           <span>${t('showTimesIn')}</span>
           <select id="view-tz">${timeZoneOptions(viewTz)}</select>
@@ -486,6 +662,7 @@ async function renderEvent(id) {
         ${viewTz !== ev.timezone ? `<p class="hint">${esc(t('createdIn', tzName(ev.timezone)))}</p>` : ''}
       </div>
       <button class="btn" id="copy">${t('copyLink')}</button>
+      <div class="head-extras" id="head-extras" hidden></div>
     </header>
     <div class="event-cols">
       <section class="card" id="mine"></section>
@@ -497,8 +674,8 @@ async function renderEvent(id) {
         <div class="chips" id="people"></div>
         <div class="legend" id="legend"></div>
         <div class="day-pager" data-pager></div>
-        <div class="grid-wrap"><div class="grid readonly" id="group-grid"></div></div>
-        <div class="hover-info" id="hover-info"></div>
+        <div class="grid-wrap"><div class="grid readonly" id="group-grid" role="group" aria-label="${esc(t('groupTitle'))}"></div></div>
+        <div class="hover-info" id="hover-info" aria-live="polite"></div>
       </section>
     </div>
     <section class="card best">
@@ -557,7 +734,8 @@ async function renderEvent(id) {
   }
   addEventListener('resize', onResize);
 
-  function gridHTML() {
+  // kind: 'mine' (caselle selezionabili) oppure 'group' (sola lettura con dettaglio).
+  function gridHTML(kind) {
     const dates = visibleDates();
     let h = `<div class="g-corner"></div>`;
     dates.forEach(d => {
@@ -580,7 +758,9 @@ async function renderEvent(id) {
         if (onHour) cls.push('hour');
         if (r === 0 || afterGap || !L.at(d, times[r - 1])) cls.push('first');
         if (r === times.length - 1 || beforeGap || !L.at(d, times[r + 1])) cls.push('last');
-        h += `<div class="${cls.join(' ')}" data-k="${key}" data-c="${c}" data-r="${r}"></div>`;
+        const label = esc(`${cap(F.long.format(parseDate(d)))}, ${hhmm(m)}–${hhmm(m + slot)}`);
+        const aria = kind === 'mine' ? `role="checkbox" aria-checked="false"` : `role="button"`;
+        h += `<div class="${cls.join(' ')}" data-k="${key}" data-c="${c}" data-r="${r}" tabindex="-1" ${aria} aria-label="${label}" data-label="${label}"></div>`;
       });
     });
     return h;
@@ -651,17 +831,31 @@ async function renderEvent(id) {
         <h2>${t('yourAvailability')}</h2>
         <span class="muted">${myPassword ? `<span title="${esc(t('protected'))}">🔒</span> ` : ''}${esc(me)} · <button class="link-btn" id="change-name">${t('logout')}</button></span>
       </div>
-      <p class="hint">${t('paintHint')}</p>
+      <p class="hint" id="paint-hint">${t('paintHint')} <span class="sr-only">${t('keyboardHint')}</span></p>
       <div class="day-pager" data-pager></div>
-      <div class="grid-wrap"><div class="grid paint" id="my-grid" style="${gridCols()}">${gridHTML()}</div></div>
-      <p class="status" id="save-status"></p>`;
+      <div class="grid-wrap"><div class="grid paint" id="my-grid" role="group" aria-label="${esc(t('yourAvailability'))}" aria-describedby="paint-hint" style="${gridCols()}">${gridHTML('mine')}</div></div>
+      <p class="status" id="save-status" role="status"></p>`;
     const grid = $('#my-grid');
-    const paint = () => grid.querySelectorAll('[data-k]').forEach(el => el.classList.toggle('on', mySlots.has(el.dataset.k)));
+    const paint = () => grid.querySelectorAll('[data-k]').forEach(el => {
+      el.classList.toggle('on', mySlots.has(el.dataset.k));
+      el.setAttribute('aria-checked', String(mySlots.has(el.dataset.k)));
+    });
     paint();
+    initRoving(grid);
     rectSelect(grid, {
       getSet: () => mySlots,
       setSet: next => { mySlots = next; paint(); renderGroup(); },
       onEnd: scheduleSave,
+    });
+    keyboardCells(grid, {
+      onToggle: cell => {
+        const next = new Set(mySlots);
+        next.has(cell.dataset.k) ? next.delete(cell.dataset.k) : next.add(cell.dataset.k);
+        mySlots = next;
+        paint();
+        renderGroup();
+        scheduleSave();
+      },
     });
     $('#change-name').addEventListener('click', () => {
       me = '';
@@ -672,8 +866,13 @@ async function renderEvent(id) {
     });
   }
 
+  let pendingSave = false;
+  const onReconnected = () => { if (pendingSave && me) scheduleSave(); };
+  addEventListener('whenly:reconnected', onReconnected);
+
   function scheduleSave() {
     const status = $('#save-status');
+    if (!status) return;
     status.classList.remove('error');
     status.textContent = t('saving');
     clearTimeout(saveTimer);
@@ -684,12 +883,16 @@ async function renderEvent(id) {
         const existing = responses.find(r => r.name === name);
         if (existing) existing.slots = slots;
         else responses.push({ name, slots });
+        pendingSave = false;
+        if (netState === 'down') setNet('ok');
         if ($('#save-status')) $('#save-status').textContent = t('saved');
       } catch (ex) {
+        noteConnection(ex);
+        pendingSave = isConnectionError(ex);
         const el = $('#save-status');
         if (el) {
           el.classList.add('error');
-          el.textContent = `${t('saveError')} ${ex.message ?? ex}`;
+          el.textContent = pendingSave ? t('saveRetry') : `${t('saveError')} ${ex.message ?? ex}`;
         }
       }
     }, 500);
@@ -699,7 +902,8 @@ async function renderEvent(id) {
   const groupGrid = $('#group-grid');
   function drawGroupGrid() {
     groupGrid.setAttribute('style', gridCols());
-    groupGrid.innerHTML = gridHTML();
+    groupGrid.innerHTML = gridHTML('group');
+    initRoving(groupGrid);
   }
   const hoverInfo = $('#hover-info');
   let hoverKey = null;
@@ -729,6 +933,7 @@ async function renderEvent(id) {
     groupGrid.querySelectorAll('[data-k]').forEach(el => {
       const n = byKey.get(el.dataset.k).length;
       el.style.background = total ? heat(n / total) : '';
+      el.setAttribute('aria-label', total ? `${el.dataset.label}: ${n}/${total} ${t('legendAvailable')}` : el.dataset.label);
     });
     showHover(hoverKey, byKey, included);
     renderBest(byKey, included);
@@ -761,6 +966,7 @@ async function renderEvent(id) {
   };
   groupGrid.addEventListener('pointerover', onHover);
   groupGrid.addEventListener('pointerdown', onHover);
+  keyboardCells(groupGrid, { onFocus: cell => onHover({ target: cell }) });
 
   $('#people').addEventListener('click', e => {
     const chip = e.target.closest('[data-name]');
@@ -826,8 +1032,15 @@ async function renderEvent(id) {
           <span>${fmtDuration(end - start)} · ${full ? t('everyone') : esc(t('missing', missing.join(', ')))}</span>
         </div>
         <span class="score${full ? ' full' : ''}">${b.group.size}/${included.length}</span>
+        ${isAdmin ? `<button type="button" class="btn small" data-confirm="${i}">${t('confirm')}</button>` : ''}
       </li>`;
     }).join('');
+
+    list.querySelectorAll('[data-confirm]').forEach(btn => btn.addEventListener('click', async () => {
+      const b = top[+btn.dataset.confirm];
+      btn.disabled = true;
+      await saveFinal({ start: b.slots[0].key, minutes: b.slots.length * slot }, btn);
+    }));
 
     list.querySelectorAll('[data-block]').forEach(li => {
       const keys = top[+li.dataset.block].slots.map(s => s.key);
@@ -846,27 +1059,93 @@ async function renderEvent(id) {
   $('#copy').addEventListener('click', async e => {
     const btn = e.currentTarget;
     try {
-      await navigator.clipboard.writeText(location.href);
+      await navigator.clipboard.writeText(eventLink(id));
       btn.textContent = t('linkCopied');
     } catch {
-      prompt(t('copyPrompt'), location.href);
+      prompt(t('copyPrompt'), eventLink(id));
     }
     setTimeout(() => { btn.textContent = t('copyLink'); }, 2000);
   });
 
+  // --- Orario confermato e barra dell'organizzatore
+  async function saveFinal(final, btn) {
+    try {
+      await store.setFinal(id, adminKey, final);
+      ev = { ...ev, final };
+      renderHeadExtras();
+      renderGroup();
+    } catch (ex) {
+      noteConnection(ex);
+      if (btn) { btn.disabled = false; btn.textContent = t('error').replace(/:$/, ''); }
+    }
+  }
+
+  function renderHeadExtras() {
+    const box = $('#head-extras');
+    let html = '';
+    if (ev.final) {
+      const { start, end } = finalRange(ev);
+      const fDate = new Intl.DateTimeFormat(lang, { timeZone: viewTz, weekday: 'long', day: 'numeric', month: 'long' });
+      const fTime = new Intl.DateTimeFormat(lang, { timeZone: viewTz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+      const links = calendarLinks(ev);
+      html += `<div class="final-banner">
+        <div class="final-when">
+          <span class="final-label">✓ ${t('confirmed')}</span>
+          <b>${esc(cap(fDate.format(start)))} · ${fTime.format(start)}–${fTime.format(end)}</b>
+        </div>
+        <div class="final-actions">
+          <span>${t('addToCalendar')}</span>
+          <a class="btn small" href="${esc(links.google)}" target="_blank" rel="noopener">Google</a>
+          <a class="btn small" href="${esc(links.outlook)}" target="_blank" rel="noopener">Outlook</a>
+          <button type="button" class="btn small" id="ics">Apple / .ics</button>
+          ${isAdmin ? `<button type="button" class="link-btn" id="undo-final">${t('undoConfirm')}</button>` : ''}
+        </div>
+      </div>`;
+    }
+    if (isAdmin) {
+      html += `<div class="organizer-bar${justCreated ? ' highlight' : ''}">
+        <span><b>${t('organizer')}</b>${justCreated ? ` · ${t('justCreated')}` : ''}</span>
+        <button type="button" class="btn small" id="copy-admin">${t('copyAdminLink')}</button>
+        <span class="hint">${t('adminHint')}</span>
+      </div>`;
+    }
+    box.innerHTML = html;
+    box.hidden = !html;
+    $('#ics')?.addEventListener('click', () => downloadIcs(ev));
+    $('#undo-final')?.addEventListener('click', e => saveFinal(null, e.currentTarget));
+    $('#copy-admin')?.addEventListener('click', async e => {
+      const btn = e.currentTarget;
+      try {
+        await navigator.clipboard.writeText(adminLink(id, adminKey));
+        btn.textContent = t('adminLinkCopied');
+      } catch {
+        prompt(t('copyPrompt'), adminLink(id, adminKey));
+      }
+      setTimeout(() => { btn.textContent = t('copyAdminLink'); }, 2000);
+    });
+  }
+
   perPage = measurePerPage();
+  renderHeadExtras();
   renderMine();
   drawGroupGrid();
   renderGroup();
   renderPagers();
 
   // Aggiornamento in tempo reale quando qualcun altro risponde.
-  const unsubscribe = store.subscribe(id, async () => {
-    responses = await store.listResponses(id);
-    renderGroup();
+  const unsubscribe = store.subscribe(id, {
+    onResponses: async () => {
+      responses = await store.listResponses(id);
+      renderGroup();
+    },
+    onEvent: async () => {
+      const fresh = await store.getEvent(id);
+      if (fresh) { ev = fresh; renderHeadExtras(); }
+    },
   });
   cleanup = () => {
     unsubscribe();
+    removeEventListener('whenly:reconnected', onReconnected);
     removeEventListener('resize', onResize);
     app.removeEventListener('click', onPage);
   };

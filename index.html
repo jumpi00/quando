@@ -4,7 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Whenly</title>
-  <meta name="description" content="Trova l'orario in cui tutti sono disponibili.">
+  <meta name="description" content="Find the right time for everyone: pick the days, share the link, see when everyone is free.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="theme-color" content="#101113">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Whenly">
+  <meta property="og:title" content="Whenly — Find the right time for everyone">
+  <meta property="og:description" content="Pick the days, share the link, see when everyone is free.">
+  <meta property="og:url" content="https://jumpi00.github.io/whenly/">
+  <meta property="og:image" content="https://jumpi00.github.io/whenly/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Whenly: Find the right time for everyone.">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -24,11 +37,12 @@
       <select id="lang"></select>
     </label>
   </header>
+  <div class="container net-wrap"><div class="net-banner" id="net-banner" role="status" hidden></div></div>
   <main id="app" class="container"></main>
   <footer class="container footer">
     <p class="footer-note" id="footer-note"></p>
     <div class="footer-row">
-      <span>©2026 Giampaolo Zirone · <a href="mailto:hello@giampaolozirone.com?subject=Whenly%20-%20">Contact me</a></span>
+      <span>©2026 Giampaolo Zirone · <a href="mailto:hello@giampaolozirone.com?subject=Whenly%20-%20">Contact me</a> · <a href="#/privacy" id="privacy-link">Privacy</a></span>
       <div class="theme-switch" id="theme-switch" role="group">
         <button type="button" data-theme-set="auto"></button>
         <button type="button" data-theme-set="light"></button>

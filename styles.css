@@ -64,7 +64,9 @@ button, input, select { font: inherit; color: inherit; }
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 
 /* Top bar */
-.topbar { max-width: 1180px; margin: 0 auto; padding: 18px 16px; }
+.topbar { max-width: 1180px; margin: 0 auto; padding: 18px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lang-pick select { width: auto; padding: 6px 10px; font-size: 13px; }
 .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; text-decoration: none; }
 .brand-mark {
   width: 18px; height: 18px; border-radius: 5px;
@@ -154,6 +156,8 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus { border-co
 .back:hover { color: var(--text); }
 .event-head h1 { margin-top: 6px; }
 .meta { color: var(--muted); margin: 6px 0 0; font-size: 14px; }
+.tz-pick { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.tz-pick select { width: auto; max-width: 100%; padding: 6px 10px; font-size: 13px; }
 .event-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
 @media (max-width: 900px) { .event-cols { grid-template-columns: 1fr; } }
 .card h2 + .hint { margin-top: 2px; }
@@ -162,16 +166,15 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus { border-co
 .status { font-size: 12px; color: var(--muted); min-height: 1.5em; margin: 8px 0 0; }
 
 /* Availability grid */
-.grid-wrap { overflow-x: auto; margin-top: 14px; padding-bottom: 4px; }
+.grid-wrap { margin-top: 14px; padding-bottom: 4px; }
 .grid {
   display: grid;
   gap: 0 3px;
   user-select: none;
-  min-width: min-content;
 }
 .grid.paint { touch-action: none; }
 .g-corner { position: sticky; left: 0; background: var(--surface); z-index: 1; }
-.g-head { text-align: center; padding-bottom: 8px; line-height: 1.2; }
+.g-head { text-align: center; padding-bottom: 8px; line-height: 1.2; min-width: 0; overflow: hidden; white-space: nowrap; }
 .g-head span { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .g-head b { font-weight: 500; font-size: 13px; }
 .g-time {
@@ -190,6 +193,8 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus { border-co
   cursor: pointer;
 }
 .g-cell.hour { border-top-color: var(--border); }
+.g-empty { height: 18px; }
+.grid .gap { margin-top: 14px; }
 .g-cell.first { border-top-left-radius: 6px; border-top-right-radius: 6px; }
 .g-cell.last { border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
 .g-cell.on { background: var(--accent); }
@@ -252,5 +257,35 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus { border-co
 .score.full { background: var(--accent); color: var(--accent-ink); }
 .empty { color: var(--muted); padding: 14px 0 4px; margin: 0; }
 
-.footer { color: var(--muted); font-size: 12px; padding-bottom: 32px; }
+.day-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.day-pager[hidden] { display: none; }
+.day-pager .btn { width: 34px; height: 34px; padding: 0; }
+.day-pager .btn:disabled { opacity: .4; cursor: default; }
+
+.footer { color: var(--muted); font-size: 13px; padding-bottom: 32px; }
+.footer-note { font-size: 12px; margin: 0 0 16px; }
+.footer-note:empty { display: none; }
+.footer-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.footer a { color: var(--text); text-underline-offset: 3px; }
+.theme-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+  background: var(--surface);
+}
+.theme-switch button {
+  border: 0;
+  background: none;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.theme-switch button[aria-pressed="true"] { background: var(--cell); color: var(--text); font-weight: 500; }
 .footer code { font-family: var(--mono); }

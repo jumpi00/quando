@@ -1,4 +1,6 @@
 import { store, isLocal } from './store.js';
+import { LANGS, lang, setLang, t } from './i18n.js';
+import { deviceTz, timeZoneOptions, tzName, utcToZoned, zonedToUtc } from './tz.js';
 
 // --- Utilità ----------------------------------------------------------------
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -8,13 +10,20 @@ const hhmm = min => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
 const isoDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const parseDate = s => new Date(`${s}T12:00:00`);
 const slotKey = (date, min) => `${date}T${hhmm(min)}`;
-
-const fmt = (opts) => new Intl.DateTimeFormat('it-IT', opts);
-const fWeekday = fmt({ weekday: 'short' });
-const fDayMonth = fmt({ day: 'numeric', month: 'short' });
-const fLong = fmt({ weekday: 'long', day: 'numeric', month: 'long' });
-const fMonth = fmt({ month: 'short' });
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+// Formattatori di date nella lingua corrente (ricreati a ogni cambio lingua).
+let F;
+function buildFormatters() {
+  const f = opts => new Intl.DateTimeFormat(lang, opts);
+  F = {
+    weekday: f({ weekday: 'short' }),
+    narrow: f({ weekday: 'narrow' }),
+    dayMonth: f({ day: 'numeric', month: 'short' }),
+    long: f({ weekday: 'long', day: 'numeric', month: 'long' }),
+    month: f({ month: 'short' }),
+  };
+}
 
 function fmtDuration(min) {
   if (min < 60) return `${min} min`;
@@ -23,9 +32,14 @@ function fmtDuration(min) {
 }
 
 function fmtDateRange(dates) {
-  if (dates.length === 1) return cap(fLong.format(parseDate(dates[0])));
-  return `${fDayMonth.format(parseDate(dates[0]))} – ${fDayMonth.format(parseDate(dates.at(-1)))} · ${dates.length} giorni`;
+  if (dates.length === 1) return cap(F.long.format(parseDate(dates[0])));
+  return `${F.dayMonth.format(parseDate(dates[0]))} – ${F.dayMonth.format(parseDate(dates.at(-1)))} · ${t('nDays', dates.length)}`;
 }
+
+const prefs = {
+  get(key, fallback) { try { return localStorage.getItem(`quando:${key}`) || fallback; } catch { return fallback; } },
+  set(key, value) { try { localStorage.setItem(`quando:${key}`, value); } catch {} },
+};
 
 const recent = {
   list() {
@@ -97,28 +111,55 @@ function rectSelect(root, { getSet, setSet, onEnd }) {
   root.addEventListener('pointercancel', stop);
 }
 
-// --- Router -----------------------------------------------------------------
+// --- Router e intestazione -------------------------------------------------
 const app = $('#app');
 let cleanup = () => {};
+
+function renderChrome() {
+  document.documentElement.lang = lang;
+  $('#lang-label').textContent = t('language');
+  $('#lang').innerHTML = Object.entries(LANGS)
+    .map(([code, label]) => `<option value="${code}"${code === lang ? ' selected' : ''}>${label}</option>`).join('');
+  $('#footer-note').innerHTML = isLocal ? t('localMode') : '';
+  const theme = prefs.get('theme', 'auto');
+  const labels = { auto: t('themeAuto'), light: t('themeLight'), dark: t('themeDark') };
+  $('#theme-switch').setAttribute('aria-label', t('theme'));
+  $('#theme-switch').querySelectorAll('[data-theme-set]').forEach(btn => {
+    btn.textContent = labels[btn.dataset.themeSet];
+    btn.setAttribute('aria-pressed', String(btn.dataset.themeSet === theme));
+  });
+}
+
+$('#theme-switch').addEventListener('click', e => {
+  const btn = e.target.closest('[data-theme-set]');
+  if (!btn) return;
+  const theme = btn.dataset.themeSet;
+  prefs.set('theme', theme);
+  if (theme === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  renderChrome();
+});
 
 async function route() {
   cleanup();
   cleanup = () => {};
-  scrollTo(0, 0);
+  buildFormatters();
+  renderChrome();
   const m = location.hash.match(/^#\/e\/([A-Za-z0-9]+)/);
   try {
     if (m) await renderEvent(m[1]);
     else renderCreate();
   } catch (err) {
     console.error(err);
-    app.innerHTML = `<div class="card"><h2>Qualcosa è andato storto</h2><p class="muted">${esc(err.message ?? err)}</p><a class="btn" href="#/">Torna all'inizio</a></div>`;
+    app.innerHTML = `<div class="card"><h2>${t('errorTitle')}</h2><p class="muted">${esc(err.message ?? err)}</p><a class="btn" href="#/">${t('backHome')}</a></div>`;
   }
 }
 
-$('#footer').innerHTML = isLocal
-  ? `Modalità locale: i dati restano solo in questo browser. Per condividere i link, configura Supabase in <code>config.js</code>.`
-  : '';
-addEventListener('hashchange', route);
+$('#lang').addEventListener('change', e => {
+  setLang(e.target.value);
+  route();
+});
+addEventListener('hashchange', () => { scrollTo(0, 0); route(); });
 route();
 
 // --- Crea evento --------------------------------------------------------------
@@ -133,65 +174,70 @@ function renderCreate() {
 
   const hourOptions = (sel, from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i)
     .map(h => `<option value="${h * 60}"${h === sel ? ' selected' : ''}>${pad(h)}:00</option>`).join('');
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const recents = recent.list();
+  const recentSubtitle = r => r.dates
+    ? `${fmtDateRange(r.dates)} · ${hhmm(r.start)}–${hhmm(r.end)}`
+    : r.subtitle ?? '';
 
   app.innerHTML = `
     <section class="hero">
-      <h1>Trova l'orario giusto per tutti</h1>
-      <p>Scegli i giorni possibili, invia il link e guarda in un colpo d'occhio quando sono liberi tutti.</p>
+      <h1>${t('heroTitle')}</h1>
+      <p>${t('heroText')}</p>
     </section>
     <div class="create-layout">
       <form class="card stack" id="create" novalidate>
         <label class="field">
-          <span>Nome dell'evento</span>
-          <input type="text" name="title" placeholder="Es. Call di kickoff con il cliente" maxlength="120" autocomplete="off">
+          <span>${t('eventName')}</span>
+          <input type="text" name="title" placeholder="${esc(t('eventNamePh'))}" maxlength="120" autocomplete="off">
         </label>
         <div class="field">
           <div class="row-between">
-            <span class="label">Giorni possibili</span>
+            <span class="label">${t('days')}</span>
             <div class="cal-nav">
-              <button type="button" class="btn" data-nav="-1" aria-label="Settimane precedenti">‹</button>
+              <button type="button" class="btn" data-nav="-1" aria-label="${esc(t('prevWeeks'))}">‹</button>
               <span id="cal-range"></span>
-              <button type="button" class="btn" data-nav="1" aria-label="Settimane successive">›</button>
+              <button type="button" class="btn" data-nav="1" aria-label="${esc(t('nextWeeks'))}">›</button>
             </div>
           </div>
-          <p class="hint">Clicca o trascina per selezionare più giorni.</p>
+          <p class="hint">${t('daysHint')}</p>
           <div class="cal" id="cal"></div>
           <p class="hint" id="cal-count"></p>
         </div>
         <div class="field-row">
-          <label class="field"><span>Dalle</span><select name="start">${hourOptions(9, 0, 23)}</select></label>
-          <label class="field"><span>Alle</span><select name="end">${hourOptions(18, 1, 24)}</select></label>
-          <label class="field"><span>Intervallo</span>
+          <label class="field"><span>${t('from')}</span><select name="start">${hourOptions(9, 0, 23)}</select></label>
+          <label class="field"><span>${t('to')}</span><select name="end">${hourOptions(18, 1, 24)}</select></label>
+          <label class="field"><span>${t('interval')}</span>
             <select name="slot">
-              <option value="15">15 min</option>
-              <option value="30" selected>30 min</option>
-              <option value="60">1 ora</option>
+              ${[15, 30, 60].map(m => `<option value="${m}"${m === 30 ? ' selected' : ''}>${fmtDuration(m)}</option>`).join('')}
             </select>
           </label>
         </div>
-        <p class="hint">Fuso orario: ${esc(tz)}</p>
+        <label class="field">
+          <span>${t('timezone')}</span>
+          <select name="tz">${timeZoneOptions(deviceTz)}</select>
+        </label>
         <div>
-          <button class="btn primary" type="submit">Crea evento</button>
+          <button class="btn primary" type="submit">${t('create')}</button>
           <p class="error" id="err"></p>
         </div>
       </form>
       <aside class="card recent">
-        <h2>I tuoi eventi</h2>
+        <h2>${t('yourEvents')}</h2>
         ${recents.length
-          ? `<ul>${recents.map(r => `<li><a href="#/e/${esc(r.id)}"><b>${esc(r.title)}</b><span>${esc(r.subtitle ?? '')}</span></a></li>`).join('')}</ul>`
-          : `<p class="hint">Gli eventi che crei o apri compariranno qui.</p>`}
+          ? `<ul>${recents.map(r => `<li><a href="#/e/${esc(r.id)}"><b>${esc(r.title)}</b><span>${esc(recentSubtitle(r))}</span></a></li>`).join('')}</ul>`
+          : `<p class="hint">${t('yourEventsEmpty')}</p>`}
       </aside>
     </div>`;
 
   const cal = $('#cal');
   const form = $('#create');
+  // 1–7 gennaio 2024 = lunedì–domenica, per avere le iniziali dei giorni nella lingua corrente.
+  const dow = Array.from({ length: 7 }, (_, i) => F.narrow.format(new Date(2024, 0, 1 + i)));
 
   function drawCal() {
     const start = new Date(monday);
     start.setDate(monday.getDate() + weekOffset * 7);
-    let html = ['L', 'M', 'M', 'G', 'V', 'S', 'D'].map(d => `<div class="cal-dow">${d}</div>`).join('');
+    let html = dow.map(d => `<div class="cal-dow">${d}</div>`).join('');
     for (let r = 0; r < WEEKS; r++) {
       for (let c = 0; c < 7; c++) {
         const d = new Date(start);
@@ -201,20 +247,18 @@ function renderCreate() {
         const showMonth = d.getDate() === 1 || (r === 0 && c === 0);
         html += `<div class="cal-day${selected.has(k) ? ' on' : ''}${k === todayIso ? ' today' : ''}"
           data-k="${k}" data-c="${c}" data-r="${r}"${past ? ' data-off' : ''}>
-          ${showMonth ? `<small>${fMonth.format(d)}</small>` : ''}${d.getDate()}</div>`;
+          ${showMonth ? `<small>${F.month.format(d)}</small>` : ''}${d.getDate()}</div>`;
       }
     }
     cal.innerHTML = html;
     const end = new Date(start);
     end.setDate(start.getDate() + WEEKS * 7 - 1);
-    $('#cal-range').textContent = `${fDayMonth.format(start)} – ${fDayMonth.format(end)}`;
+    $('#cal-range').textContent = `${F.dayMonth.format(start)} – ${F.dayMonth.format(end)}`;
     $('[data-nav="-1"]').disabled = weekOffset <= 0;
     updateCount();
   }
   function updateCount() {
-    $('#cal-count').textContent = selected.size
-      ? `${selected.size} ${selected.size === 1 ? 'giorno selezionato' : 'giorni selezionati'}`
-      : 'Nessun giorno selezionato';
+    $('#cal-count').textContent = t('daysSelected', selected.size);
   }
 
   rectSelect(cal, {
@@ -237,13 +281,13 @@ function renderCreate() {
     const err = $('#err');
     const title = form.title.value.trim();
     const start = +form.start.value, end = +form.end.value;
-    if (!title) { err.textContent = 'Dai un nome all\'evento.'; form.title.focus(); return; }
-    if (!selected.size) { err.textContent = 'Seleziona almeno un giorno.'; return; }
-    if (end <= start) { err.textContent = 'L\'orario di fine deve essere dopo quello di inizio.'; return; }
+    if (!title) { err.textContent = t('errTitle'); form.title.focus(); return; }
+    if (!selected.size) { err.textContent = t('errDays'); return; }
+    if (end <= start) { err.textContent = t('errTime'); return; }
     err.textContent = '';
     const btn = form.querySelector('[type="submit"]');
     btn.disabled = true;
-    btn.textContent = 'Creazione…';
+    btn.textContent = t('creating');
     try {
       const id = await store.createEvent({
         title,
@@ -251,86 +295,169 @@ function renderCreate() {
         start_minute: start,
         end_minute: end,
         slot_minutes: +form.slot.value,
-        timezone: tz,
+        timezone: form.tz.value,
       });
       location.hash = `#/e/${id}`;
     } catch (ex) {
-      err.textContent = `Impossibile creare l'evento: ${ex.message ?? ex}`;
+      err.textContent = `${t('errCreate')} ${ex.message ?? ex}`;
       btn.disabled = false;
-      btn.textContent = 'Crea evento';
+      btn.textContent = t('create');
     }
   });
 }
 
+// --- Griglia nel fuso di chi guarda -------------------------------------------
+// Le risposte sono salvate con chiavi nel fuso dell'evento ("2026-10-09T10:00").
+// Qui ogni slot viene riposizionato nel fuso scelto da chi guarda.
+function buildLayout(ev, viewTz) {
+  const slots = [];
+  for (const d of ev.dates) {
+    for (let m = ev.start_minute; m < ev.end_minute; m += ev.slot_minutes) {
+      const key = slotKey(d, m);
+      const pos = viewTz === ev.timezone ? { date: d, min: m } : utcToZoned(zonedToUtc(d, m, ev.timezone), viewTz);
+      slots.push({ key, ...pos });
+    }
+  }
+  const dates = [...new Set(slots.map(s => s.date))].sort();
+  const times = [...new Set(slots.map(s => s.min))].sort((a, b) => a - b);
+  const byPos = new Map(slots.map(s => [`${s.date}|${s.min}`, s.key]));
+  const byKey = new Map(slots.map(s => [s.key, s]));
+  return {
+    dates, times,
+    keys: slots.map(s => s.key),
+    at: (d, m) => byPos.get(`${d}|${m}`) ?? null,
+    pos: key => byKey.get(key),
+  };
+}
+
 // --- Pagina evento ------------------------------------------------------------
 async function renderEvent(id) {
-  app.innerHTML = `<p class="muted">Caricamento…</p>`;
+  app.innerHTML = `<p class="muted">${t('loading')}</p>`;
   const ev = await store.getEvent(id);
   if (!ev) {
-    app.innerHTML = `<div class="card"><h2>Evento non trovato</h2><p class="muted">Il link potrebbe essere sbagliato o l'evento non esiste più.</p><a class="btn" href="#/">Crea un nuovo evento</a></div>`;
+    app.innerHTML = `<div class="card"><h2>${t('notFound')}</h2><p class="muted">${t('notFoundText')}</p><a class="btn" href="#/">${t('createNew')}</a></div>`;
     return;
   }
 
-  const dates = ev.dates;
-  const times = [];
-  for (let m = ev.start_minute; m < ev.end_minute; m += ev.slot_minutes) times.push(m);
-  const subtitle = `${fmtDateRange(dates)} · ${hhmm(ev.start_minute)}–${hhmm(ev.end_minute)}`;
-  recent.add({ id, title: ev.title, subtitle });
+  const viewTz = prefs.get('tz', deviceTz);
+  const L = buildLayout(ev, viewTz);
+  const { dates, times } = L;
+  const slot = ev.slot_minutes;
+  recent.add({ id, title: ev.title, dates: ev.dates, start: ev.start_minute, end: ev.end_minute });
 
   let responses = await store.listResponses(id);
   let { name: me, password: myPassword } = session.get(id);
   let mySlots = new Set(responses.find(r => r.name === me)?.slots ?? []);
   const excluded = new Set();
-  const durOptions = [30, 60, 90, 120, 180].filter(d => d >= ev.slot_minutes && d <= ev.end_minute - ev.start_minute);
-  let minDuration = durOptions.includes(60) ? 60 : durOptions[0] ?? ev.slot_minutes;
+  const durOptions = [30, 60, 90, 120, 180].filter(d => d >= slot && d <= ev.end_minute - ev.start_minute);
+  let minDuration = durOptions.includes(60) ? 60 : durOptions[0] ?? slot;
 
   app.innerHTML = `
     <header class="event-head">
       <div>
-        <a href="#/" class="back">← Nuovo evento</a>
+        <a href="#/" class="back">${t('newEvent')}</a>
         <h1>${esc(ev.title)}</h1>
-        <p class="meta">${esc(subtitle)} · ${esc(ev.timezone)}</p>
+        <p class="meta">${esc(fmtDateRange(dates))} · ${hhmm(times[0])}–${hhmm(times.at(-1) + slot)}</p>
+        <label class="tz-pick">
+          <span>${t('showTimesIn')}</span>
+          <select id="view-tz">${timeZoneOptions(viewTz)}</select>
+        </label>
+        ${viewTz !== ev.timezone ? `<p class="hint">${esc(t('createdIn', tzName(ev.timezone)))}</p>` : ''}
       </div>
-      <button class="btn" id="copy">Copia link da condividere</button>
+      <button class="btn" id="copy">${t('copyLink')}</button>
     </header>
     <div class="event-cols">
       <section class="card" id="mine"></section>
       <section class="card" id="group">
         <div class="row-between">
-          <h2>Disponibilità del gruppo</h2>
+          <h2>${t('groupTitle')}</h2>
           <span class="muted" id="group-count"></span>
         </div>
         <div class="chips" id="people"></div>
         <div class="legend" id="legend"></div>
+        <div class="day-pager" data-pager></div>
         <div class="grid-wrap"><div class="grid readonly" id="group-grid"></div></div>
         <div class="hover-info" id="hover-info"></div>
       </section>
     </div>
     <section class="card best">
       <div class="row-between">
-        <h2>Orari migliori</h2>
-        <label class="cal-nav">Durata minima
+        <h2>${t('bestTitle')}</h2>
+        <label class="cal-nav">${t('minDuration')}
           <select id="min-dur" style="width:auto">${durOptions.map(d => `<option value="${d}"${d === minDuration ? ' selected' : ''}>${fmtDuration(d)}</option>`).join('')}</select>
         </label>
       </div>
       <ol id="best-list"></ol>
     </section>`;
 
-  const gridCols = `grid-template-columns: 52px repeat(${dates.length}, minmax(44px, 1fr))`;
+  $('#view-tz').addEventListener('change', e => {
+    prefs.set('tz', e.target.value);
+    route();
+  });
+
+  // Su schermi stretti i giorni si sfogliano a gruppi, così la griglia non scorre in orizzontale.
+  let pageStart = 0;
+  let perPage = dates.length;
+  function measurePerPage() {
+    const width = $('#group').clientWidth - 40;
+    return Math.max(2, Math.min(dates.length, Math.floor((width - 52) / 46)));
+  }
+  function visibleDates() {
+    pageStart = Math.max(0, Math.min(pageStart, dates.length - perPage));
+    return dates.slice(pageStart, pageStart + perPage);
+  }
+  const gridCols = () => `grid-template-columns: 52px repeat(${visibleDates().length}, minmax(0, 1fr))`;
+  function renderPagers() {
+    const shown = visibleDates();
+    const html = dates.length > perPage
+      ? `<button type="button" class="btn" data-page="-1" aria-label="${esc(t('prevDays'))}"${pageStart === 0 ? ' disabled' : ''}>‹</button>
+         <span>${F.dayMonth.format(parseDate(shown[0]))} – ${F.dayMonth.format(parseDate(shown.at(-1)))} · ${pageStart + 1}–${pageStart + shown.length} / ${dates.length}</span>
+         <button type="button" class="btn" data-page="1" aria-label="${esc(t('nextDays'))}"${pageStart + perPage >= dates.length ? ' disabled' : ''}>›</button>`
+      : '';
+    app.querySelectorAll('[data-pager]').forEach(el => { el.innerHTML = html; el.hidden = !html; });
+  }
+  function redrawGrids() {
+    if (me) renderMine();
+    drawGroupGrid();
+    renderGroup();
+    renderPagers();
+  }
+  function onPage(e) {
+    const btn = e.target.closest('[data-page]');
+    if (!btn) return;
+    pageStart += +btn.dataset.page * perPage;
+    redrawGrids();
+  }
+  app.addEventListener('click', onPage);
+  function onResize() {
+    const next = measurePerPage();
+    if (next !== perPage) { perPage = next; redrawGrids(); }
+  }
+  addEventListener('resize', onResize);
+
   function gridHTML() {
+    const dates = visibleDates();
     let h = `<div class="g-corner"></div>`;
     dates.forEach(d => {
       const dt = parseDate(d);
-      h += `<div class="g-head"><span>${fWeekday.format(dt)}</span><b>${fDayMonth.format(dt)}</b></div>`;
+      h += `<div class="g-head"><span>${F.weekday.format(dt)}</span><b>${F.dayMonth.format(dt)}</b></div>`;
     });
     times.forEach((m, r) => {
-      h += `<div class="g-time">${m % 60 === 0 || r === 0 ? hhmm(m) : ''}</div>`;
+      // Stacco visivo quando le righe non sono consecutive (es. dopo mezzanotte in un altro fuso).
+      const afterGap = r > 0 && m - times[r - 1] !== slot;
+      const beforeGap = r < times.length - 1 && times[r + 1] - m !== slot;
+      const onHour = afterGap || (m - times[0]) % 60 === 0;
+      const gap = afterGap ? ' gap' : '';
+      h += `<div class="g-time${gap}">${onHour ? hhmm(m) : ''}</div>`;
       dates.forEach((d, c) => {
+        const key = L.at(d, m);
+        if (!key) { h += `<div class="g-empty${gap}"></div>`; return; }
         const cls = ['g-cell'];
-        if (m % 60 === 0) cls.push('hour');
-        if (r === 0) cls.push('first');
-        if (r === times.length - 1) cls.push('last');
-        h += `<div class="${cls.join(' ')}" data-k="${slotKey(d, m)}" data-c="${c}" data-r="${r}"></div>`;
+        if (afterGap) cls.push('gap');
+        if (onHour) cls.push('hour');
+        if (r === 0 || afterGap || !L.at(d, times[r - 1])) cls.push('first');
+        if (r === times.length - 1 || beforeGap || !L.at(d, times[r + 1])) cls.push('last');
+        h += `<div class="${cls.join(' ')}" data-k="${key}" data-c="${c}" data-r="${r}"></div>`;
       });
     });
     return h;
@@ -342,7 +469,7 @@ async function renderEvent(id) {
     if (me && (mySlots.size || map.has(me))) map.set(me, mySlots);
     return [...map.entries()]
       .map(([name, slots]) => ({ name, slots }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'it'));
+      .sort((a, b) => a.name.localeCompare(b.name, lang));
   }
 
   // --- La mia disponibilità
@@ -352,18 +479,18 @@ async function renderEvent(id) {
   function renderMine() {
     if (!me) {
       mine.innerHTML = `
-        <h2>La tua disponibilità</h2>
-        <p class="hint">Inserisci il tuo nome per indicare quando sei libero. Se hai già risposto, rientra con lo stesso nome e password.</p>
+        <h2>${t('yourAvailability')}</h2>
+        <p class="hint">${t('joinHint')}</p>
         <form class="join-form" id="join">
-          <label class="field"><span>Nome</span>
+          <label class="field"><span>${t('name')}</span>
             <input type="text" name="name" maxlength="40" autocomplete="username" required>
           </label>
-          <label class="field"><span>Password <span class="muted">(facoltativa)</span></span>
+          <label class="field"><span>${t('password')} <span class="muted">${t('optional')}</span></span>
             <input type="password" name="password" maxlength="72" autocomplete="current-password">
           </label>
-          <button class="btn primary">Continua</button>
+          <button class="btn primary">${t('continue')}</button>
         </form>
-        <p class="hint">Con una password solo tu potrai modificare la tua risposta, anche da un altro dispositivo.</p>
+        <p class="hint">${t('passwordHint')}</p>
         <p class="error" id="join-err"></p>`;
       $('#join').addEventListener('submit', async e => {
         e.preventDefault();
@@ -375,9 +502,7 @@ async function renderEvent(id) {
         btn.disabled = true;
         try {
           if (!(await store.checkPassword(id, name, password))) {
-            $('#join-err').textContent = password
-              ? 'Password errata per questo nome.'
-              : 'Questo nome è protetto da password: inseriscila per modificare la risposta.';
+            $('#join-err').textContent = password ? t('errWrongPw') : t('errProtected');
             form.password.focus();
             return;
           }
@@ -388,7 +513,7 @@ async function renderEvent(id) {
           renderMine();
           renderGroup();
         } catch (ex) {
-          $('#join-err').textContent = `Errore: ${ex.message ?? ex}`;
+          $('#join-err').textContent = `${t('error')} ${ex.message ?? ex}`;
         } finally {
           btn.disabled = false;
         }
@@ -397,11 +522,12 @@ async function renderEvent(id) {
     }
     mine.innerHTML = `
       <div class="row-between">
-        <h2>La tua disponibilità</h2>
-        <span class="muted">${myPassword ? '<span title="Protetto da password">🔒</span> ' : ''}${esc(me)} · <button class="link-btn" id="change-name">esci</button></span>
+        <h2>${t('yourAvailability')}</h2>
+        <span class="muted">${myPassword ? `<span title="${esc(t('protected'))}">🔒</span> ` : ''}${esc(me)} · <button class="link-btn" id="change-name">${t('logout')}</button></span>
       </div>
-      <p class="hint">Trascina sulle caselle in cui sei libero. Trascina di nuovo per togliere.</p>
-      <div class="grid-wrap"><div class="grid paint" id="my-grid" style="${gridCols}">${gridHTML()}</div></div>
+      <p class="hint">${t('paintHint')}</p>
+      <div class="day-pager" data-pager></div>
+      <div class="grid-wrap"><div class="grid paint" id="my-grid" style="${gridCols()}">${gridHTML()}</div></div>
       <p class="status" id="save-status"></p>`;
     const grid = $('#my-grid');
     const paint = () => grid.querySelectorAll('[data-k]').forEach(el => el.classList.toggle('on', mySlots.has(el.dataset.k)));
@@ -422,7 +548,7 @@ async function renderEvent(id) {
 
   function scheduleSave() {
     const status = $('#save-status');
-    status.textContent = 'Salvataggio…';
+    status.textContent = t('saving');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
       const name = me, slots = [...mySlots].sort();
@@ -431,29 +557,26 @@ async function renderEvent(id) {
         const existing = responses.find(r => r.name === name);
         if (existing) existing.slots = slots;
         else responses.push({ name, slots });
-        if ($('#save-status')) $('#save-status').textContent = 'Salvato ✓';
+        if ($('#save-status')) $('#save-status').textContent = t('saved');
       } catch (ex) {
-        if ($('#save-status')) $('#save-status').textContent = `Errore nel salvataggio: ${ex.message ?? ex}`;
+        if ($('#save-status')) $('#save-status').textContent = `${t('saveError')} ${ex.message ?? ex}`;
       }
     }, 500);
   }
 
   // --- Vista di gruppo
   const groupGrid = $('#group-grid');
-  groupGrid.setAttribute('style', gridCols);
-  groupGrid.innerHTML = gridHTML();
+  function drawGroupGrid() {
+    groupGrid.setAttribute('style', gridCols());
+    groupGrid.innerHTML = gridHTML();
+  }
   const hoverInfo = $('#hover-info');
-  const defaultHover = 'Passa sopra (o tocca) una casella per vedere chi è disponibile.';
   let hoverKey = null;
 
   function availability() {
     const all = people();
     const included = all.filter(p => !excluded.has(p.name));
-    const byKey = new Map();
-    for (const d of dates) for (const m of times) {
-      const k = slotKey(d, m);
-      byKey.set(k, included.filter(p => p.slots.has(k)).map(p => p.name));
-    }
+    const byKey = new Map(L.keys.map(k => [k, included.filter(p => p.slots.has(k)).map(p => p.name)]));
     return { all, included, byKey };
   }
 
@@ -461,12 +584,12 @@ async function renderEvent(id) {
     const { all, included, byKey } = availability();
     const total = included.length;
 
-    $('#group-count').textContent = `${all.length} ${all.length === 1 ? 'risposta' : 'risposte'}`;
-    $('#people').innerHTML = all.length
-      ? all.map(p => `<button class="chip${excluded.has(p.name) ? ' off' : ''}" data-name="${esc(p.name)}" title="Includi/escludi dal calcolo">${esc(p.name)}${p.name === me ? ' (tu)' : ''}</button>`).join('')
-      : '';
+    $('#group-count').textContent = t('responses', all.length);
+    $('#people').innerHTML = all
+      .map(p => `<button class="chip${excluded.has(p.name) ? ' off' : ''}" data-name="${esc(p.name)}" title="${esc(t('toggleTitle'))}">${esc(p.name)}${p.name === me ? ` ${t('you')}` : ''}</button>`)
+      .join('');
     $('#legend').innerHTML = total
-      ? `<span>0/${total}</span><span class="legend-bar">${Array.from({ length: Math.min(total, 8) + 1 }, (_, i) => `<i style="background:${heat(i / Math.min(total, 8))}"></i>`).join('')}</span><span>${total}/${total} disponibili</span>`
+      ? `<span>0/${total}</span><span class="legend-bar">${Array.from({ length: Math.min(total, 8) + 1 }, (_, i) => `<i style="background:${heat(i / Math.min(total, 8))}"></i>`).join('')}</span><span>${total}/${total} ${t('legendAvailable')}</span>`
       : '';
 
     groupGrid.querySelectorAll('[data-k]').forEach(el => {
@@ -484,15 +607,14 @@ async function renderEvent(id) {
 
   function showHover(key, byKey, included) {
     groupGrid.querySelectorAll('.hover').forEach(el => el.classList.remove('hover'));
-    if (!key || !included.length) { hoverInfo.innerHTML = included.length ? defaultHover : 'Ancora nessuna risposta: condividi il link per raccogliere le disponibilità.'; return; }
+    if (!key || !included.length) { hoverInfo.innerHTML = included.length ? t('hoverDefault') : t('noResponses'); return; }
     groupGrid.querySelector(`[data-k="${key}"]`)?.classList.add('hover');
-    const [d, t] = key.split('T');
-    const [h, m] = t.split(':').map(Number);
+    const { date, min } = L.pos(key);
     const yes = byKey.get(key);
     const no = included.map(p => p.name).filter(n => !yes.includes(n));
-    hoverInfo.innerHTML = `<b>${esc(cap(fLong.format(parseDate(d))))}, ${t}–${hhmm(h * 60 + m + ev.slot_minutes)}</b> · ${yes.length}/${included.length}<br>
-      ${yes.length ? `Disponibili: <b>${yes.map(esc).join(', ')}</b>` : 'Nessuno disponibile'}
-      ${no.length ? `<br>Non disponibili: ${no.map(esc).join(', ')}` : ''}`;
+    hoverInfo.innerHTML = `<b>${esc(cap(F.long.format(parseDate(date))))}, ${hhmm(min)}–${hhmm(min + slot)}</b> · ${yes.length}/${included.length}<br>
+      ${yes.length ? `${t('available')}: <b>${yes.map(esc).join(', ')}</b>` : t('nobody')}
+      ${no.length ? `<br>${t('unavailable')}: ${no.map(esc).join(', ')}` : ''}`;
   }
 
   const onHover = e => {
@@ -513,51 +635,67 @@ async function renderEvent(id) {
     renderGroup();
   });
 
+  // Sequenze di slot consecutivi per ogni giorno, nel fuso di chi guarda.
+  function runsOfDay(d) {
+    const runs = [];
+    let run = [];
+    times.forEach((m, r) => {
+      const key = L.at(d, m);
+      const contiguous = run.length && m - run.at(-1).min === slot;
+      if (!key || (run.length && !contiguous)) { if (run.length) runs.push(run); run = []; }
+      if (key) run.push({ key, min: m });
+    });
+    if (run.length) runs.push(run);
+    return runs;
+  }
+
   // --- Orari migliori: blocchi consecutivi in cui lo stesso gruppo è libero.
   function renderBest(byKey, included) {
     const list = $('#best-list');
     if (!included.length) {
-      list.innerHTML = `<p class="empty">Gli orari migliori appariranno qui appena qualcuno risponde.</p>`;
+      list.innerHTML = `<p class="empty">${t('bestEmpty')}</p>`;
       return;
     }
-    const minSlots = Math.max(1, Math.ceil(minDuration / ev.slot_minutes));
+    const minSlots = Math.max(1, Math.ceil(minDuration / slot));
     const blocks = [];
     for (const d of dates) {
-      const sets = times.map(m => new Set(byKey.get(slotKey(d, m))));
-      for (let i = 0; i + minSlots <= times.length; i++) {
-        let group = new Set(sets[i]);
-        for (let j = i + 1; j < i + minSlots; j++) group = new Set([...group].filter(n => sets[j].has(n)));
-        if (!group.size) continue;
-        let end = i + minSlots;
-        while (end < times.length && [...group].every(n => sets[end].has(n))) end++;
-        // Scarta i blocchi che iniziano dentro un blocco precedente con lo stesso gruppo.
-        if (i > 0 && [...group].every(n => sets[i - 1].has(n))) continue;
-        blocks.push({ date: d, from: i, to: end, group });
+      for (const run of runsOfDay(d)) {
+        const sets = run.map(s => new Set(byKey.get(s.key)));
+        for (let i = 0; i + minSlots <= run.length; i++) {
+          let group = new Set(sets[i]);
+          for (let j = i + 1; j < i + minSlots; j++) group = new Set([...group].filter(n => sets[j].has(n)));
+          if (!group.size) continue;
+          // Scarta i blocchi che iniziano dentro un blocco precedente con lo stesso gruppo.
+          if (i > 0 && [...group].every(n => sets[i - 1].has(n))) continue;
+          let end = i + minSlots;
+          while (end < run.length && [...group].every(n => sets[end].has(n))) end++;
+          blocks.push({ date: d, slots: run.slice(i, end), group });
+        }
       }
     }
-    blocks.sort((a, b) => b.group.size - a.group.size || (b.to - b.from) - (a.to - a.from) || a.date.localeCompare(b.date) || a.from - b.from);
+    blocks.sort((a, b) => b.group.size - a.group.size || b.slots.length - a.slots.length
+      || a.date.localeCompare(b.date) || a.slots[0].min - b.slots[0].min);
     const top = blocks.slice(0, 6);
     if (!top.length) {
-      list.innerHTML = `<p class="empty">Nessun blocco di almeno ${fmtDuration(minDuration)} in cui qualcuno sia disponibile. Prova a ridurre la durata minima.</p>`;
+      list.innerHTML = `<p class="empty">${t('bestNone', fmtDuration(minDuration))}</p>`;
       return;
     }
     list.innerHTML = top.map((b, i) => {
-      const start = times[b.from], end = times[b.to - 1] + ev.slot_minutes;
+      const start = b.slots[0].min, end = b.slots.at(-1).min + slot;
       const missing = included.map(p => p.name).filter(n => !b.group.has(n));
       const full = !missing.length;
       return `<li data-block="${i}">
         <span class="rank">${i + 1}</span>
         <div class="when">
-          <b>${esc(cap(fLong.format(parseDate(b.date))))} · ${hhmm(start)}–${hhmm(end)}</b>
-          <span>${fmtDuration(end - start)} · ${full ? 'Ci sono tutti' : `Manca: ${missing.map(esc).join(', ')}`}</span>
+          <b>${esc(cap(F.long.format(parseDate(b.date))))} · ${hhmm(start)}–${hhmm(end)}</b>
+          <span>${fmtDuration(end - start)} · ${full ? t('everyone') : esc(t('missing', missing.join(', ')))}</span>
         </div>
         <span class="score${full ? ' full' : ''}">${b.group.size}/${included.length}</span>
       </li>`;
     }).join('');
 
     list.querySelectorAll('[data-block]').forEach(li => {
-      const b = top[+li.dataset.block];
-      const keys = times.slice(b.from, b.to).map(m => slotKey(b.date, m));
+      const keys = top[+li.dataset.block].slots.map(s => s.key);
       li.addEventListener('pointerenter', () => keys.forEach((k, idx) => {
         const el = groupGrid.querySelector(`[data-k="${k}"]`);
         el?.classList.add('hl');
@@ -574,19 +712,27 @@ async function renderEvent(id) {
     const btn = e.currentTarget;
     try {
       await navigator.clipboard.writeText(location.href);
-      btn.textContent = 'Link copiato ✓';
+      btn.textContent = t('linkCopied');
     } catch {
-      prompt('Copia questo link:', location.href);
+      prompt(t('copyPrompt'), location.href);
     }
-    setTimeout(() => { btn.textContent = 'Copia link da condividere'; }, 2000);
+    setTimeout(() => { btn.textContent = t('copyLink'); }, 2000);
   });
 
+  perPage = measurePerPage();
   renderMine();
+  drawGroupGrid();
   renderGroup();
+  renderPagers();
 
   // Aggiornamento in tempo reale quando qualcun altro risponde.
-  cleanup = store.subscribe(id, async () => {
+  const unsubscribe = store.subscribe(id, async () => {
     responses = await store.listResponses(id);
     renderGroup();
   });
+  cleanup = () => {
+    unsubscribe();
+    removeEventListener('resize', onResize);
+    app.removeEventListener('click', onPage);
+  };
 }

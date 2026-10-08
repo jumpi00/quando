@@ -9,6 +9,8 @@ Un When2meet essenziale: crei un evento, mandi il link, ognuno segna quando è l
 - Classifica degli orari migliori con durata minima.
 - Password facoltativa per partecipante, per modificare la propria risposta da qualsiasi dispositivo.
 - Aggiornamento in tempo reale quando qualcuno risponde.
+- Fuso orario: chi crea l'evento lo sceglie, chi risponde vede gli orari convertiti nel proprio fuso (modificabile).
+- Lingua: si apre nella lingua del dispositivo (IT, EN, ES, FR, DE; altrimenti inglese), con selettore in alto.
 
 Sito statico (HTML/CSS/JS, nessuna build) + [Supabase](https://supabase.com) gratuito come database.
 
@@ -44,12 +46,13 @@ La chiave `anon` è pensata per stare nel codice pubblico. Come su When2meet, ch
 | `index.html` | Struttura della pagina |
 | `styles.css` | Stile (tema chiaro/scuro automatico) |
 | `app.js` | Pagine "crea evento" ed "evento", griglie, classifica |
+| `i18n.js` | Traduzioni (per aggiungere una lingua, copia il blocco `en`) |
+| `tz.js` | Conversioni di fuso orario |
 | `store.js` | Salvataggio dati: Supabase oppure localStorage |
 | `config.js` | Chiavi Supabase |
 | `sql/` | Schema del database, da eseguire in ordine |
 
 ## Limiti attuali
 
-- Gli orari sono nel fuso di chi crea l'evento (mostrato in pagina).
 - Chi risponde senza password può essere modificato da chiunque scriva lo stesso nome.
 - Una password dimenticata non si recupera (si può cancellare la riga da Supabase → Table Editor → `response_secrets`).

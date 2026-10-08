@@ -1,4 +1,4 @@
-# Quando
+# Whenly
 
 Un When2meet essenziale: crei un evento, mandi il link, ognuno segna quando è libero e vedi subito gli orari migliori.
 

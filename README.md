@@ -28,7 +28,7 @@ Apri http://localhost:5173. Senza Supabase configurato l'app gira in **modalità
 ### 1. Database (Supabase, ~5 minuti)
 
 1. Crea un account e un nuovo progetto su supabase.com (piano Free).
-2. Vai su **SQL Editor → New query**, incolla il contenuto di `sql/001-schema.sql` e premi **Run**. Ripeti con `sql/002-password.sql` e `sql/003-description-contact.sql`.
+2. Vai su **SQL Editor → New query**, incolla il contenuto di `sql/001-schema.sql` e premi **Run**. Ripeti con `sql/002-password.sql` `sql/003-description-contact.sql` e `sql/004-cleanup.sql`.
 3. Vai su **Project Settings → API** e copia **Project URL** e la chiave **anon public**.
 4. Incollale in `config.js`.
 
@@ -54,6 +54,8 @@ La chiave `anon` è pensata per stare nel codice pubblico. Come su When2meet, ch
 | `sql/` | Schema del database, da eseguire in ordine |
 
 ## Limiti attuali
+
+- Gli eventi vengono cancellati automaticamente 30 giorni dopo l'ultima data (`sql/004-cleanup.sql`).
 
 - Chi risponde senza password può essere modificato da chiunque scriva lo stesso nome.
 - Una password dimenticata non si recupera (si può cancellare la riga da Supabase → Table Editor → `response_secrets`).

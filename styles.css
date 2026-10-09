@@ -506,8 +506,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 /* --- Telefono: calendario più grande e facile da toccare ------------------------ */
 @media (max-width: 520px) {
   .card { padding: 16px 14px; }
-  .create-form .cal { gap: 5px; }
-  .cal-day { aspect-ratio: auto; min-height: 46px; font-size: 16px; border-radius: 10px; }
+  /* Il calendario si allarga fin quasi al bordo del riquadro per caselle più grandi */
+  .create-form .cal { gap: 4px; margin-inline: -9px; }
+  .cal-day { aspect-ratio: auto; min-height: 54px; font-size: 17px; border-radius: 10px; }
   .cal-day small { font-size: 9px; }
   .cal-dow { font-size: 12px; }
   .create-form .cal-nav span { font-size: 12px; }

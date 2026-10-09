@@ -512,4 +512,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
   .cal-dow { font-size: 12px; }
   .create-form .cal-nav span { font-size: 12px; }
   .tz-pick select { width: 100%; }
+  .footer-row { flex-direction: column; justify-content: center; text-align: center; gap: 14px; }
+  .footer-note { text-align: center; }
 }

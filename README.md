@@ -1,6 +1,6 @@
 # Whenly
 
-Un When2meet essenziale: crei un evento, mandi il link, ognuno segna quando è libero e vedi subito gli orari migliori.
+Crei un evento, mandi il link, ognuno segna quando è libero e vedi subito gli orari migliori.
 
 - Nessun account: basta il link.
 - Griglia a trascinamento (mouse e touch).
@@ -16,33 +16,6 @@ Un When2meet essenziale: crei un evento, mandi il link, ognuno segna quando è l
 - Banner per connessione assente o database non raggiungibile; scadenza dell'evento visibile.
 - Informativa privacy (`privacy.js`), favicon ⏱️ e anteprima per i link condivisi (`og.png`).
 - Lingua: si apre nella lingua del dispositivo (IT, EN, ES, FR, DE; altrimenti inglese), con selettore in alto.
-
-Sito statico (HTML/CSS/JS, nessuna build) + [Supabase](https://supabase.com) gratuito come database.
-
-## Provarla in locale
-
-```bash
-python3 -m http.server 5173
-```
-
-Apri http://localhost:5173. Senza Supabase configurato l'app gira in **modalità locale**: i dati restano nel browser, utile per provarla ma non per condividerla.
-
-## Metterla online
-
-### 1. Database (Supabase, ~5 minuti)
-
-1. Crea un account e un nuovo progetto su supabase.com (piano Free).
-2. Vai su **SQL Editor → New query**, incolla il contenuto di `sql/001-schema.sql` e premi **Run**. Ripeti con `sql/002-password.sql` `sql/003-description-contact.sql`, `sql/004-cleanup.sql` e `sql/005-organizer-final.sql`.
-3. Vai su **Project Settings → API** e copia **Project URL** e la chiave **anon public**.
-4. Incollale in `config.js`.
-
-La chiave `anon` è pensata per stare nel codice pubblico. Come su When2meet, chiunque abbia il link di un evento può vederlo e rispondere.
-
-### 2. Hosting (GitHub Pages)
-
-1. Crea un repository su GitHub e carica questa cartella.
-2. **Settings → Pages → Build and deployment**: Source = *Deploy from a branch*, Branch = `main`, cartella `/ (root)`.
-3. Dopo un minuto il sito è su `https://<utente>.github.io/<repo>/`.
 
 ## File
 
